@@ -804,6 +804,7 @@ def C_V(t, p, phase):
     """
     return C_V_normal(t,p) + delta_C_V_Tc(p, phase)
 
+
 def kappa_0(t, p):
     """
     Gas-kinetic expression for thermal conductivity, V&W eqn 2.40.  
@@ -873,12 +874,8 @@ def gamma_c(p):
 
     Parameters
     ----------
-    t : float, int, numpy.ndarray
-        Reduced temperature, $T/T_c$.
     p : float, int, numpy.ndarray
         Pressure in bar.
-
-    Only one or other of t and p can be an array.
 
     Returns
     -------
@@ -960,136 +957,5 @@ def diffusion_relaxation_length(p):
     """
     return (thermal_diffusivity(1, p) / gamma_c(p)  )**0.5
 
-def hot_blob_length_scale(p, phase='A'):
-    """
-    Length scale of a normal region produced by 1 eV energy, injected into 
-    superfluid in given phase at zero temperature, defined as 
-    $$
-    L = (C_V T_c/ 1 {\rm eV})^{-1/3}
-    $$
-    Units: nm.
-    
-    Radius of hot blob would contain geometric factors from region shape, and 
-    algebraic factors from integration of temperature between $0$ and $T_c$.
 
-    Parameters
-    ----------
-    p : float, int, numpy.ndarray 
-        Pressure in bar.
-
-    Returns
-    -------
-    type(p)
-        Length scale of the heated region, in nm..
-
-    """
-    C_V_Tc = C_V_normal(1, p) + delta_C_V_Tc(p, phase)
-    return (Tc_mK(p)/1000 * C_V_Tc/h3c.c.e)**(-1/3)
-
-def hot_blob_size(p, t, Q_eV, phase='A'):
-    """
-    Size of a normal region produced by Q_eV energy, injected into 
-    superfluid in given phase at reduced temperature t. 
-    
-    Units: nm.
-    
-    Radius of hot blob would contain geometric factors from region shape, and 
-    algebraic factors from integration of temperature between $0$ and $T_c$.
-
-    Parameters
-    ----------
-    p : float, int, numpy.ndarray 
-        Pressure in bar.
-
-    Returns
-    -------
-    type(p)
-        Length scale of the heated region, in nm..
-
-    """
-    return hot_blob_length_scale(p, phase='A') * (Q_eV/(1 - t))**(1/3)
-
-def hot_blob_quench_time(p, t, Q_eV=1.0, phase='A'):
-    """
-    Quench time of a normal region produced by Q_eV energy, injected into 
-    superfluid in given phase at reduced temperature t. 
-    
-    Units: ns.
-    
-    Parameters
-    ----------
-    p : float, int, numpy.ndarray 
-        Pressure in bar.
-
-    Returns
-    -------
-    type(p)
-        Quench time for hot blob, in ns..
-
-    """
-    return hot_blob_size(p, t, Q_eV, phase='A')**2/thermal_diffusivity(t, p) *1/(1-t)
-
-# Generate SC adjustment factor
-def logf_poly():
-    p = np.linspace(h3d.p_pcp_bar, 34, 100)
-    global DEFAULT_SC_ADJUST
-    tmp = DEFAULT_SC_ADJUST
-    DEFAULT_SC_ADJUST = False
-    logf = np.log(tAB_expt(p)/t_AB(p))
-    DEFAULT_SC_ADJUST=tmp
-    return nppoly.Polynomial.fit(p, logf, 2)
-
-def sc_adjust_fun(p):
-    sc_corr_adj_pol = logf_poly()
-    adj_exp = sc_corr_adj_pol(p)
-    if DEFAULT_SC_ADJUST_MIN_P=="p_pcp_bar":
-        p0 = h3d.p_pcp_bar
-    else:
-        p0 = 0
-    if isinstance(adj_exp, np.ndarray) or isinstance(adj_exp, pd.Series):
-        adj_exp[p < p0] = 0.0
-    else: # assume float
-        if p < p0:
-            adj_exp = 0.0
-    return adj_exp
-
-def mass_B_norm(t, p, JC):
-    """B phase masses for mode with spin parity JC
-    """
-    bb = beta_B_norm(t, p)
-    
-    if JC == "1-":        
-        m2 = (- beta_norm(t, p, 1)+ (beta_norm(t, p, 4) - beta_norm(t, p, 3) - beta_norm(t, p, 5))/3) / bb
-    elif JC == "2+":
-        m2 = ((beta_norm(t, p, 3) + beta_norm(t, p, 4) + beta_norm(t, p, 5))/3) / bb
-    elif JC == "2-":
-        m2 = (- beta_norm(t, p, 1)) / bb
-
-    return np.sqrt(m2)        
-
-# Now in he3_magnetic
-
-# def critical_radius(t, p, sigma=0.95, dim=3):
-#     """Radius of critical bubble, in nm.  
-#     Ideally will optionally use function to get 
-#     surface tension. Uses approximation."""
-#     # if isinstance(sigma_fun, float):
-#     sigma_AB = sigma*np.abs(f_B_norm(t,p))*xi(t,p)
-#     # elif isinstance(sigma_fun, np.ndarray):
-#         # sigma_AB = sigma_fun*np.abs(f_B_norm(t,p))*xi(t,p)
-    
-#     return (dim-1)*sigma_AB/np.abs(f_A_norm(t,p) - f_B_norm(t,p))
-
-# def critical_energy_kBTc(t, p, sigma=0.95, dim=3):
-#     """Energy of critical bubble, in units of kBTc.  
-#     Uses thin wall & Ginzburg-Landau approximation.
-#     """
-
-#     Rc = critical_radius(t, p, sigma, dim)
-#     sigma_AB = sigma*np.abs(f_B_norm(t,p))*xi(t,p)
-#     delta_fAB = np.abs(f_A_norm(t, p) - f_B_norm(t, p))
-    
-#     Ec = f_scale(p)*(4*np.pi*sigma_AB*Rc**2 - (4*np.pi/3)*delta_fAB*Rc**3)
-    
-#     return Ec/(h3c.kB*Tc_mK(p)*1e-3)
 
