@@ -427,8 +427,8 @@ def gH(p):
     """
     Material parameter for Zeeman energy, quadratic in magnetic field H, in 
     dimensionless units, where order parameter is scaled with $k_BT_c$, and 
-    magnetic field is measured in tesla.
-
+    magnetic field is measured in tesla.  
+    
     Parameters
     ----------
     p : float, array-like
@@ -598,6 +598,7 @@ def mat_pars(t,p):
 def beta_phase_norm(t, p, phase):
     """Effective single beta parameter in a given phase.
     """
+    print('t', t, 'p', p)
     return np.sum( beta_norm_asarray(t, p) * h3b.R_dict[phase] )
 
 def f_phase_norm(t, p, phase):
@@ -784,6 +785,8 @@ def C_V(t, p, phase):
     $$
     C_V = C_N + \Delta C_V
     $$
+    Below $T_c$ (i.e. for t < 1) it uses the emperical observation that the 
+    specific heat deecreases apprximately as $t^3$.
 
     Units:  units J / K / nm$^3$
 
@@ -802,7 +805,13 @@ def C_V(t, p, phase):
         Specific heat at temperature $t$ and pressure p.
 
     """
-    return C_V_normal(t,p) + delta_C_V_Tc(p, phase)
+    t = np.atleast_1d(t)
+    
+    C_V = (C_V_normal(1,p) + delta_C_V_Tc(p, phase))*t**3
+    
+    C_V[t>1] = C_V_normal(t[t>1], p)
+    
+    return C_V
 
 
 def kappa_0(t, p):
