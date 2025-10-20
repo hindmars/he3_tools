@@ -507,7 +507,7 @@ def surface_energy_AB_approx(t, p, H=0, sigma=0.95):
     """
     return sigma*np.abs(f_phase_mag_norm('B', t, p, H))*h3p.xi(t,p)
 
-def critical_radius(t_in, p, H=0, sigma=0.95, dim=3):
+def critical_radius(t_in, p_in, H=0, sigma=0.95, dim=3):
     """Radius of thin-wall critical bubble, in nm, with magnetic field. 
     Units: nm
 
@@ -516,24 +516,41 @@ def critical_radius(t_in, p, H=0, sigma=0.95, dim=3):
     # if isinstance(sigma_fun, float):
     # sigma_AB = sigma*np.abs(f_B_mag_norm_approx(t,p,H))*h3p.xi(t,p)
     
-    try:
-        t_iterator = iter(t_in)
-        f_B_mag_norm = np.zeros_like(t_in)
-        f_A_mag_norm = np.zeros_like(t_in)
-        for n, t in enumerate(t_in):
-            f_B_mag_norm[n] = f_phase_mag_norm('B', t, p, H)
-            f_A_mag_norm[n] = f_phase_mag_norm('A', t, p, H)
-            
-    except TypeError:    
-        t = t_in
-        f_B_mag_norm = f_phase_mag_norm('B', t, p, H)
-        f_A_mag_norm = f_phase_mag_norm('A', t, p, H)
+    t_in = np.atleast_1d(t_in)
+    p_in = np.atleast_1d(p_in)
+    # f_B_mag_norm = np.zeros_like(t_in)
+    # f_A_mag_norm = np.zeros_like(t_in)
+    in_shape = (len(t_in), len(p_in))
+    f_B_mag_norm = np.zeros(in_shape)
+    f_A_mag_norm = np.zeros(in_shape)
+    sigma_AB = np.zeros(in_shape)
+    for m, t in enumerate(t_in):
+        for n, p in enumerate(p_in):
+            f_B_mag_norm[m,n] = f_phase_mag_norm('B', t, p, H)
+            f_A_mag_norm[m,n] = f_phase_mag_norm('A', t, p, H)
+            sigma_AB[m,n] = sigma*np.abs(f_B_mag_norm[m,n])*h3p.xi(t, p)
+
     
-    sigma_AB = sigma*np.abs(f_B_mag_norm)*h3p.xi(t_in, p)
+    # try:
+    #     t_iterator = iter(t_in)
+    #     f_B_mag_norm = np.zeros_like(t_in)
+    #     f_A_mag_norm = np.zeros_like(t_in)
+    #     for n, t in enumerate(t_in):
+    #         f_B_mag_norm[n] = f_phase_mag_norm('B', t, p, H)
+    #         f_A_mag_norm[n] = f_phase_mag_norm('A', t, p, H)
+            
+    # except TypeError:    
+    #     t = t_in
+    #     f_B_mag_norm = f_phase_mag_norm('B', t, p, H)
+    #     f_A_mag_norm = f_phase_mag_norm('A', t, p, H)
+
+
+    
+    # sigma_AB = sigma*np.abs(f_B_mag_norm)*h3p.xi(t_in, p_in)
     # elif isinstance(sigma_fun, np.ndarray):
         # sigma_AB = sigma_fun*np.abs(f_B_norm(t,p))*xi(t,p)
     
-    return (dim-1)*sigma_AB/(f_A_mag_norm - f_B_mag_norm)
+    return np.squeeze((dim-1)*sigma_AB/(f_A_mag_norm - f_B_mag_norm))
 
 def critical_energy(t, p, H=0, sigma=0.95, dim=3):
     """Energy of thin-wall critical bubble, in nm, with magnetic field.

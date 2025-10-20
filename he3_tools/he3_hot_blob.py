@@ -112,7 +112,7 @@ def hot_blob_quench_time(t, p, Q_eV=1.0, phase='A'):
         Quench time for hot blob, in ns..
 
     """
-    return hot_blob_size(p, t, Q_eV, phase='A')**2/h3p.thermal_diffusivity(t, p) *1/(1-t)
+    return hot_blob_size(t, p, Q_eV, phase='A')**2/h3p.thermal_diffusivity(t, p) *1/(1-t)
 
 def truncated_sphere_volume(Rn, h):
     """
@@ -182,17 +182,17 @@ def hot_blob_radius(t, p, Q_eV, h, phase='A', model='average'):
     
     vol_nm3 = hot_blob_vol(t, p, Q_eV, phase)
     
-    vol_mm3 = np.atleast_1d(vol_nm3)
+    vol_nm3 = np.atleast_1d(vol_nm3)
     
-    Rb_arr = (vol_mm3*3/(4*np.pi))**(1/3)
+    Rb_arr = (vol_nm3*3/(4*np.pi))**(1/3)
     
     if model == 'average':
             
-        for n, v in enumerate(vol_mm3):
+        for n, v in enumerate(vol_nm3):
             Rb_arr[n] = fsolve(lambda Rn: truncated_sphere_volume(Rn, h) - v, x0=1e9)
 
     elif model == 'simple':
-        Rb2 = (vol_mm3*3/(np.pi * h))**(1/2)
+        Rb2 = (vol_nm3*3/(np.pi * h))**(1/2)
         
         Rb_arr[Rb_arr > h/2] = Rb2[Rb_arr > h/2]
 

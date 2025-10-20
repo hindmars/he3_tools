@@ -41,6 +41,15 @@ sc_corr_adj_pol = nppoly.Polynomial([0])
 SET_ALPHA_TYPE = {"GL", "BCS"}
 DEFAULT_ALPHA_TYPE = "GL"
 
+def squeeze_float(x):
+    x = np.squeeze(x)
+    try:
+        x = float(x)
+    except:
+        pass
+    return x
+
+
 def get_setting(name):
     """Gets value of a globally defined variable.
     """
@@ -123,11 +132,19 @@ def Tc_mK(p):
     
     return Tc_mK_expt(p)
 
+def Tc_K(p):
+    """ Critical temperature in kelvin, at pressure p (bar).
+    """
+    return Tc_mK_expt(p)*1e-3
 
 def T_mK(t, p):
     """Converts reduced temperature ($T/T_c$) to temperature in mK.
     """
-    return t * Tc_mK_expt(p)
+    t = np.atleast_1d(t)
+    p = np.atleast_1d(p)
+    Tc_mK_arr = np.outer(t, Tc_mK_expt(p))
+    
+    return squeeze_float(Tc_mK_arr)
 
 def TAB_mK_expt(p):
     """
@@ -261,23 +278,47 @@ def F0a(p):
     """Landau parameter $F_0^a$."""
     return h3d.F0a_poly(p)
 
-def xi(t, p):
+def xi(t, p, squeeze_me=True, diagonal=False):
     """Ginzburg Landau correlation length at pressure p bar (nm).
     """
-    return h3c.xiGL_const*xi0(p)/(-alpha_norm(t))**0.5
+    t = np.atleast_1d(t)
+    p = np.atleast_1d(p)
+    
+    if diagonal:
+        x = 1/(-alpha_norm(t))**0.5 * h3c.xiGL_const*xi0(p)
+    else:
+        x = np.outer(1/(-alpha_norm(t))**0.5, h3c.xiGL_const*xi0(p))
 
-def xi_delta(t, p):
+    if squeeze_me:
+        x = squeeze_float(x)
+    
+    # return h3c.xiGL_const*xi0(p)/(-alpha_norm(t))**0.5
+    return x
+
+def xi_delta(t, p, squeeze_me=True, diagonal=False):
     """BCS correlation length at pressure p bar (nm).
     """
-    return h3c.xiGL_const*xi0(p)/(-alpha_bcs(t))**0.5
+    t = np.atleast_1d(t)
+    p = np.atleast_1d(p)
+    
+    if diagonal:
+        x = 1/(-alpha_bcs(t))**0.5 * h3c.xiGL_const*xi0(p)
+    else:
+        x = np.outer(1/(-alpha_bcs(t))**0.5, h3c.xiGL_const*xi0(p))
+
+    if squeeze_me:
+        x = squeeze_float(x)
+
+
+    return x
     
 def N0(p):
-    """Density of states at Fermi surface, units nm$^{-3}$ J$^{-1}$.
+    """Single-spin density of states at Fermi surface, units nm$^{-3}$ J$^{-1}$.
     """
     return npart(p) * 1.5 / (h3c.mhe3_kg * mstar_m(p) * vf(p)**2)
 
 def Gi(p):
-    """Ginzrurg number at pressure p.
+    """Ginzburg number at pressure p.
     
     Gi = N(0) * xi0(p)**3 * kB * T_c(p)
     
@@ -373,7 +414,7 @@ def tau_qp(t, p):
         T = T_mK(t, p)
     print(p, tauT2_interp, T)
     
-    return tauT2_interp /T**2 * 1e-6
+    return 1/T**2 * tauT2_interp  * 1e-6
 
 def mfp0(t, p):
     """
@@ -397,7 +438,7 @@ def mfp0(t, p):
 
     """
     
-    return vf(p)*tauN0(t, p)*1e9
+    return tauN0(t, p)*vf(p)*1e9
 
 def mfp_qp(t, p):
     """
@@ -421,7 +462,7 @@ def mfp_qp(t, p):
 
     """
     
-    return vf(p)*tau_qp(t, p)*1e9
+    return tau_qp(t, p)*vf(p)*1e9
 
 def gH(p):
     """
@@ -480,7 +521,19 @@ def H_scale(t, p):
         Magnetic field in tesla.
 
     """
-    return np.sqrt(-alpha_norm(t)/gH(p))
+    t = np.atleast_1d(t)
+    p = np.atleast_1d(p)
+
+    h_s = np.sqrt(np.outer(-alpha_norm(t),1/gH(p)))
+    
+    h_s = np.squeeze(h_s)
+
+    try:
+        h_s = float(h_s)
+    except:
+        pass
+
+    return h_s
 
 # Theory functions
 def f_scale(p):
@@ -523,8 +576,8 @@ def delta_b(p, n):
     else:
         db = delta_b_interp(p, n)
     
-    if DEFAULT_SC_ADJUST:
-            db *= np.exp(-sc_adjust_fun(p))
+    # if DEFAULT_SC_ADJUST:
+    #         db *= np.exp(-sc_adjust_fun(p))
     return db
 
 def delta_b_asarray(p, n_list=range(1,6)):
@@ -562,56 +615,125 @@ def alpha_bcs(t):
     """
     return (t**h3c.a_bcs - 1 )/h3c.a_bcs
 
-def alpha_norm(t):
+def alpha_norm(t, squeeze_me=True):
     """Quadratic material parameter
     """
+    t = np.atleast_1d(t)
     if DEFAULT_ALPHA_TYPE == "GL":
-        return t - 1
+        a = t - 1
     elif DEFAULT_ALPHA_TYPE == "BCS":
-        return alpha_bcs(t)
+        a =  alpha_bcs(t)
     else:
         raise ValueError("DEFAULT_ALPHA_TYPE must be GL or BCS")
-        return
 
-def beta_norm(t, p, n):
+    if squeeze_me:
+        a = squeeze_float(a)
+        
+    return a
+
+def beta_wc_norm(n):
+    """Weak coupling material parameter for each n (in [1,2,3,4,5]), 
+    with units of f_scale/(2 * np.pi * kB * Tc)**2
+    """ 
+    return h3c.beta_const*b_wc(n)
+
+def beta_wc_norm_asarray():
+    """Weak coupling material parameters as array, 
+    with units of f_scale/(2 * np.pi * kB * Tc)**2
+    """ 
+    beta_wc_norm_list = [ beta_wc_norm(n) for n in range(1,6)]
+    return np.array(beta_wc_norm_list)
+
+def delta_beta_norm(t, p, n):
+    """Strong coupling correction to material parameter beta(n), 
+    with units of f_scale/(2 * np.pi * kB * Tc)**2
+    """ 
+    t = np.atleast_1d(t)
+    p = np.atleast_1d(p)
+    t_db = np.outer(t, delta_b(p, n))
+
+    return squeeze_float(t_db)
+
+def delta_beta_norm_asarray(t, p):
+    delta_beta_norm_list = [ delta_beta_norm(t, p, n) for n in range(1,6)]
+    return np.array(delta_beta_norm_list)
+
+def beta_norm(t, p, n, squeeze_me=True, diagonal=False):
     """Complete material parameter including strong coupling correction, within units of 
     f_scale/(2 * np.pi * kB * Tc)**2
     """ 
     b = b_wc(n)
-    # else:
-    #     raise ValueError("beta_norm: n must be between 1 and 5")
-    return h3c.beta_const*(b + t * delta_b(p, n))
+    
+    t = np.atleast_1d(t)
+    p = np.atleast_1d(p)
+    
+    if diagonal:
+        t_db = t * delta_b(p, n)
+    else:
+        t_db = np.outer(t, delta_b(p, n))
 
+    be = h3c.beta_const*(b + t_db)
+    
+    if squeeze_me:
+        be = squeeze_float(be)
 
-def beta_norm_asarray(t, p):
-    beta_norm_list = [ beta_norm(t, p, n) for n in range(1,6)]
+    return be
+
+def beta_norm_asarray(t, p, squeeze_me=True, diagonal=False):
+    beta_norm_list = [ beta_norm(t, p, n, squeeze_me, diagonal) for n in range(1,6)]
     return np.array(beta_norm_list)
 
 def mat_pars(t,p):
-    """All 6 bulk material parameters alpha, beta_a as a numpy array.
+    """All 6 bulk material parameters alpha, beta_a as a tuple.
     """
-    pars = np.zeros((6,))
-    pars[0] = alpha_norm(t)
-    pars[1:] = beta_norm_asarray(t, p)
-    return pars
+    # pars = np.zeros((6,))
+    # pars[0] = alpha_norm(t)
+    # pars[1:] = beta_norm_asarray(t, p)
+    return alpha_norm(t), beta_norm_asarray(t, p)
 
-def beta_phase_norm(t, p, phase):
+def beta_phase_norm(t, p, phase, squeeze_me=True, diagonal=False):
     """Effective single beta parameter in a given phase.
     """
     print('t', t, 'p', p)
-    return np.sum( beta_norm_asarray(t, p) * h3b.R_dict[phase] )
+    return np.sum( (beta_norm_asarray(t, p, squeeze_me, diagonal).T * h3b.R_dict[phase]).T, axis=0) 
 
-def f_phase_norm(t, p, phase):
+def f_phase_norm(t, p, phase, squeeze_me=True, diagonal=False):
     """Normalised free energy in a given phase.
     """
-    return -0.25* alpha_norm(t)**2 /( beta_phase_norm(t, p, phase))
+    t = np.atleast_1d(t)
+    p = np.atleast_1d(p)
 
-def delta_phase_norm(t, p, phase):
+    if diagonal:
+        f = -0.25* alpha_norm(t)**2 /( beta_phase_norm(t, p, phase, squeeze_me=False, diagonal=True))
+    else:
+        f = -0.25* alpha_norm(t[:,None])**2 /( beta_phase_norm(t, p, phase, squeeze_me=False))
+        
+    f[f > 0] = 0.0
+    
+    if squeeze_me:
+        f = squeeze_float(f)
+        
+    return f
+
+def delta_phase_norm(t, p, phase, squeeze_me=True, diagonal=False):
     """Normalised gap parameter in a given phase.
     """
-    return np.sqrt(- alpha_norm(t)/(2 * beta_phase_norm(t, p, phase)))
+    t = np.atleast_1d(t)
+    p = np.atleast_1d(p)
+    t[t>1.0] = 1.0
+    
+    if diagonal:
+        d = np.sqrt(- alpha_norm(t)/(2 * beta_phase_norm(t, p, phase, squeeze_me=False, diagonal=True)))
+    else:
+        d = np.sqrt(- alpha_norm(t[:, None])/(2 * beta_phase_norm(t, p, phase, squeeze_me=False)))
+
+    if squeeze_me:
+        d = squeeze_float(d)
+    return d
 
 def delta_wc(t):
+    t = np.atleast_1d(t)
+    t[t>1.0] = 1.0
     return np.sqrt(- alpha_norm(t)/(2 * h3c.beta_const))
 
 def beta_A_norm(t, p):    
@@ -635,41 +757,56 @@ def beta_polar_norm(t, p):
     """
     return beta_norm(t, p, 1) + beta_norm(t, p, 2) + (beta_norm(t, p, 3) + beta_norm(t, p, 4) + beta_norm(t, p, 5))
 
-def f_A_norm(t, p):
+def f_A_norm(t, p, squeeze_me=True, diagonal=False):
     """Normalised free energy density for A phase, in units of (1/3) N(0) (k_B T_c)^2.
     """
-    return -0.25* alpha_norm(t)**2 /( beta_A_norm(t, p))
-    
-def f_B_norm(t, p):
+    # t = np.atleast_1d(t)
+    # p = np.atleast_1d(p)
+    # t[t>1.0] = 1.0
+    # return -0.25* alpha_norm(t)**2 /( beta_A_norm(t, p).T).T
+    return f_phase_norm(t, p, 'A', squeeze_me, diagonal)    
+
+def f_B_norm(t, p, squeeze_me=True, diagonal=False):
     """Normalised free energy density for B phase, in units of (1/3) N(0) (k_B T_c)^2.
     """
-    return -0.25* alpha_norm(t)**2 /( beta_B_norm(t, p))
+    # t = np.atleast_1d(t)
+    # p = np.atleast_1d(p)
+    # t[t>1.0] = 1.0
+    # return -0.25* alpha_norm(t)**2 /( beta_B_norm(t, p).T).T
+    return f_phase_norm(t, p, 'B', squeeze_me, diagonal)    
 
-def f_planar_norm(t, p):
+def f_planar_norm(t, p, squeeze_me=True, diagonal=False):
     """Normalised free energy density for planar phase, in units of (1/3) N(0) (k_B T_c)^2.
     """
-    return -0.25* alpha_norm(t)**2 /( beta_planar_norm(t, p))
+    # t = np.atleast_1d(t)
+    # p = np.atleast_1d(p)
+    # t[t>1.0] = 1.0
+    # return -0.25* alpha_norm(t)**2 /( beta_planar_norm(t, p).T).T
+    return f_phase_norm(t, p, 'planar', squeeze_me, diagonal)    
 
 def delta_A_norm(t, p):
     """Gap parameter for A phase, normalised to (kB * Tc)
     """    
-    return np.sqrt(- alpha_norm(t)/(2 * beta_A_norm(t,p)))
-
+    # return np.sqrt(- alpha_norm(t)/(2 * beta_A_norm(t,p)).T).T
+    return delta_phase_norm(t, p, 'A')
 
 def delta_B_norm(t, p):
     """Gap parameter for B phase, normalised to (kB * Tc)
     """
-    return  np.sqrt(- alpha_norm(t)/(2 * beta_B_norm(t, p)))
+    # return  np.sqrt(- alpha_norm(t)/(2 * beta_B_norm(t, p)).T).T
+    return delta_phase_norm(t, p, 'B')
 
 def delta_planar_norm(t, p):
     """Gap parameter for planar phase, normalised to (kB * Tc)
     """
-    return  np.sqrt(- alpha_norm(t)/(2 * beta_planar_norm(t, p)))
+    # return  np.sqrt(- alpha_norm(t)/(2 * beta_planar_norm(t, p)).T).T
+    return delta_phase_norm(t, p, 'planar')
 
 def delta_polar_norm(t, p):
     """Gap parameter for planar phase, normalised to (kB * Tc)
     """
-    return  np.sqrt(- alpha_norm(t)/(2 * beta_polar_norm(t, p)))
+    # return  np.sqrt(- alpha_norm(t)/(2 * beta_polar_norm(t, p)).T).T
+    return delta_phase_norm(t, p, 'polar')
 
 def t_AB(p, low_pressure_nan=True):
     """ AB transition temperature at pressure p, normalised to Tc.
@@ -699,59 +836,78 @@ def TAB_mK(p):
 
 # specific heats
 
-def C_V_normal(t, p):
+# def C_V_normal(t, p):
+#     """
+#     Normal phase specific heat in units J / K / nm$^3$, with strong coupling 
+#     corrections included.  Uses formula (2.13) from Vollhardt & Woelfle.
+#     $$
+#     C_V = \frac{\pi^2}{3} N_F k_B^2 T
+#     $$
+
+#     Parameters
+#     ----------
+#     t : float, int, numpy.ndarray
+#         Reduced temperature, $T/T_c$.
+#     p : float, int, numpy.ndarray
+#         Pressure in bar.
+
+#     Only one or other of t and p can be an array.
+
+#     Returns
+#     -------
+#     float or numpy.ndarray
+#         Normal phase specific heat at temperature $t$ and pressure p.
+
+#     """
+    
+#     return (np.pi**2/3) * h.N0(p) * h.kB**2 *( h.Tc_mK(p)/1000) * t    
+
+def C_V_normal(t, p, squeeze_me=True, diagonal=False):
     """
     Normal phase specific heat in units J / K / nm$^3$, with strong coupling 
     corrections included.  Uses formula (2.13) from Vollhardt & Woelfle.
     $$
     C_V = \frac{\pi^2}{3} N_F k_B^2 T
     $$
+    where $N_F$ is the total density of states, including the spin sum.
 
     Parameters
     ----------
-    t : float, int, numpy.ndarray
+    t : float, int, numpy.ndarray (1D)
         Reduced temperature, $T/T_c$.
-    p : float, int, numpy.ndarray
+    p : float, int, numpy.ndarray (1D)
         Pressure in bar.
 
-    Only one or other of t and p can be an array.
 
     Returns
     -------
     float or numpy.ndarray
-        Normal phase specific heat at temperature $t$ and pressure p.
+        Normal phase specific heat at temperature $t$ and pressure $p$. 
+        If both t and p are 1D arrays of length greater than 1, the return 
+        value has shape (len(t), len(p))
 
     """
     
-    return (np.pi**2/3) * h.N0(p) * h.kB**2 *( h.Tc_mK(p)/1000) * t    
+    # Remember that N0 is the single-spin density of states
+    c_scale =  np.pi**2 * (2*N0(p)) * h3c.kB**2 *(Tc_mK(p)/1000) / 3 
+    t = np.atleast_1d(t)
+    p = np.atleast_1d(p)
+    # c_v =np.outer(t, np.pi**2 * f_scale(p) / (Tc_mK(p)/1000))
+    if diagonal:
+        c_v = t * c_scale
+    else:
+        c_v = np.outer(t, c_scale)    
+            
+    if squeeze_me:
+        c_v = np.squeeze(c_v)
 
-def C_V_normal(t, p):
-    """
-    Normal phase specific heat in units J / K / nm$^3$, with strong coupling 
-    corrections included.  Uses formula (2.13) from Vollhardt & Woelfle.
-    $$
-    C_V = \frac{\pi^2}{3} N_F k_B^2 T
-    $$
+    try:
+        c_v = float(c_v)
+    except:
+        pass
 
-    Parameters
-    ----------
-    t : float, int, numpy.ndarray
-        Reduced temperature, $T/T_c$.
-    p : float, int, numpy.ndarray
-        Pressure in bar.
-
-    Only one or other of t and p can be an array.
-
-    Returns
-    -------
-    float or numpy.ndarray
-        Normal phase specific heat at temperature $t$ and pressure p.
-
-    """
-    
-    # return (np.pi**2/3) * N0(p) * h3c.kB**2 *(Tc_mK(p)/1000) * t    
-    return  np.pi**2 * f_scale(p) / (Tc_mK(p)/1000) * t
-
+    # return  np.pi**2 * f_scale(p) / (Tc_mK(p)/1000) * t
+    return c_v
 
 def delta_C_V_Tc(p, phase):
     """
@@ -797,7 +953,7 @@ def C_V(t, p, phase):
     p : float, int, numpy.ndarray
         Pressure in bar.
 
-    Only one or other of t and p can be an array.
+    If both t and p are arrays, then C_V is 2D array.
 
     Returns
     -------
@@ -806,12 +962,20 @@ def C_V(t, p, phase):
 
     """
     t = np.atleast_1d(t)
+    p = np.atleast_1d(p)
     
-    C_V = (C_V_normal(1,p) + delta_C_V_Tc(p, phase))*t**3
+    c_v = np.outer(t**3, C_V_normal(1,p) + delta_C_V_Tc(p, phase) )
+        
+    c_v[t>1,:] = C_V_normal(t[t>1], p, squeeze_me=False)
+
+    # c_v = np.squeeze(c_v)
     
-    C_V[t>1] = C_V_normal(t[t>1], p)
+    # try:
+    #     c_v = float(c_v)
+    # except:
+    #     pass
     
-    return C_V
+    return squeeze_float(c_v)
 
 
 def kappa_0(t, p):
@@ -836,7 +1000,21 @@ def kappa_0(t, p):
 
     """
     # C_V is in J / K / nm^3, vf is in m/s (also nm/ns), tau_qp is in seconds
-    return (1/3) * C_V_normal(t, p) * (vf(p))**2 * tau_qp(t, p) * 1e9
+    t = np.atleast_1d(t)
+    p = np.atleast_1d(p)
+
+    vf2 = (vf(p))**2 
+    k0 = (1e9/3) * C_V_normal(t, p) * tau_qp(t, p) * vf2[None, :]
+
+    k0 = np.squeeze(k0)
+
+    try:
+        k0 = float(k0)
+    except:
+        pass
+    # return (1/3) * C_V_normal(t, p) * (vf(p))**2 * tau_qp(t, p) * 1e9
+    return k0
+
 
 def kappa(t, p):
     """
@@ -859,6 +1037,9 @@ def kappa(t, p):
         Measured thermal conductivity at temperature $t$ and pressure p.
 
     """
+    t = np.atleast_1d(t)
+    p = np.atleast_1d(p)
+
     p_data = h3d.data_Gre86_therm_cond[:, 0]
     kappaT_data = h3d.data_Gre86_therm_cond[:, 4]
     
@@ -873,9 +1054,17 @@ def kappa(t, p):
     else:
         T = T_mK(t, p)*1e-3
 
-    print(p, T, kappaT_interp)
+    k = kappaT_interp[None, :] / T
 
-    return kappaT_interp/T
+    k = np.squeeze(k)
+    
+    try:
+        k = float(k)
+    except:
+        pass
+    # print(p, T, kappaT_interp)
+
+    return k
 
 def gamma_c(p):
     """

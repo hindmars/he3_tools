@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 
 import numpy as np
-import he3_props as h3p
-import he3_bases as h3b
-import he3_constants as h3c
-import he3_data as h3d
-import he3_matrix as h3m
-import he3_free_energy as h3f
+import he3_tools.he3_props as h3p
+import he3_tools.he3_bases as h3b
+import he3_tools.he3_constants as h3c
+import he3_tools.he3_data as h3d
+import he3_tools.he3_matrix as h3m
+import he3_tools.he3_free_energy as h3f
 
 
 # Theory functions
@@ -17,53 +17,48 @@ def s_scale(p):
     return h3p.f_scale(p) / (h3p.T_mK(1, p) * 1e-3)
 
 
-def entropy_density_norm(t, p, phase):
+def entropy_density_norm(t, p, phase, squeeze_me=True, diagonal=False):
     """
-    Normalised entropy density, in units of $(1/3)N(0)k_B^2T_c$.
+    Normalised entropy density, in units of $(1/3)N(0)k_B^2T_c$, calculated from 
+    approximate volumetric specific heat (Greywall 1986), by integrating from $T_c$.
 
     Parameters
     ----------
-    t : TYPE
-        DESCRIPTION.
-    p : TYPE
-        DESCRIPTION.
-    phase : TYPE
-        DESCRIPTION.
+    t : int, float, numpy.ndarray 1D
+        Reduced temperature $T/T_c$.
+    p : nt, float, numpy.ndarray 1D
+        Pressure in bar.
+    phase : str
+        Superfluid phase: [ A | B | planar | polar ].
 
     Returns
     -------
-    TYPE
-        DESCRIPTION.
+    float, numpy.ndarray
+        Normalised entropy density. If t and p are both ndarrays of length greater 
+        than 1, the returned array has shape (len(t), len(p)). 
 
     """
     
-    A = h3p.delta_phase_norm(t, p, phase) * h3b.D_dict[phase]
-    dim = A.ndim
-    A_T = np.swapaxes(A, dim-2, dim-1)
-    # A_C = np.conj(A)
-    A_H = np.conj(A_T)
+    t = np.atleast_1d(t)
+    p = np.atleast_1d(p)
+    # N0 is single-spin density of states
+    c_scale = (np.pi**2/3) * (2*h3p.N0(p)) * h3c.kB**2 *(h3p.Tc_mK(p)/1000) 
 
-    AA_H = np.matmul(A , A_H)
-    AA_T = np.matmul(A , A_T)
-        
-    delta_beta_arr = h3c.beta_const * h3p.delta_beta_norm_asarray(p)
+    C_V_norm_Tc = h3p.C_V(1, p, phase)/(c_scale)
     
-    dUn0_dT = h3m.tr( AA_H )
+    sf_int_fac = (t**3 - 1)/3
+    sf_int_fac[sf_int_fac > 0] = 0.0
+    # Entropy density at Tc is equal to the volumetric specific heat, as it is linear in t
+    if diagonal:
+        s_norm = specific_heat_N_norm(t) + sf_int_fac * C_V_norm_Tc
+    else:
+        s_norm = specific_heat_N_norm(t)[:,None] + np.outer(sf_int_fac,  C_V_norm_Tc)
     
-    dUn1_dT = delta_beta_arr[0] *  h3m.tr( AA_T) * np.conj(h3m.tr( AA_T))
-    dUn2_dT = delta_beta_arr[1] *  h3m.tr( AA_H )**2
-    dUn3_dT = delta_beta_arr[2] *  h3m.tr( np.matmul( AA_T , np.conj(AA_T))  )
-    dUn4_dT = delta_beta_arr[3] *  h3m.tr( np.matmul( AA_H , AA_H )  )
-    dUn5_dT = delta_beta_arr[4] *  h3m.tr( np.matmul( AA_H , np.conj(AA_H) )  )
-    
-    # This is entropy density relative to the normal phase, so need to add it 
-    # Normal phase value is $\pi^2 t$ in these units.
-    
-    s_norm = np.pi**2 * t + dUn0_dT + dUn1_dT + dUn2_dT + dUn3_dT + dUn4_dT + dUn5_dT
-    
-    return s_norm.real
+    if squeeze_me:
+        s_norm = h3p.squeeze_float(s_norm)
+    return s_norm
 
-def specific_heat_N_norm(t, p):
+def specific_heat_N_norm(t):
     """
     Specific heat in the normal phase, in of $(1/3)N(0)k_B^2T_c$.
 
@@ -80,19 +75,37 @@ def specific_heat_N_norm(t, p):
 
     """
     
-    return np.pi**2 * t
+    return np.pi**2 * t * 2 # spin states
 
-def enthalpy_density_norm(t, p, phase):
+def enthalpy_density_norm(t, p, phase, squeeze_me=True, diagonal=False):
     
-    return t * entropy_density_norm(t, p, phase)
+    t = np.atleast_1d(t)
+    p = np.atleast_1d(p)
+    if diagonal:
+        w = t * entropy_density_norm(t, p, phase, squeeze_me=False, diagonal=True)
+    else:
+        w = t[:,None] * entropy_density_norm(t, p, phase, squeeze_me=False)
+    
+    if squeeze_me:
+        w = h3p.squeeze_float(w)
+        
+    return w
+
+def latent_heat_norm(p):
+    
+    tAB = h3p.tAB(p)
+    
+    LAB = enthalpy_density_norm(tAB, p, 'B', diagonal=True) - enthalpy_density_norm(tAB, p, 'A', diagonal=True)
+    
+    return LAB
 
 def energy_density_norm(t, p, phase):
     
     return enthalpy_density_norm(t, p, phase) - h3p.f_phase_norm(t, p, phase)
     
-def theta_norm(t, p, phase):
+def theta_norm(t, p, phase, squeeze_me=True, diagonal=False):
     
-    return 0.25*enthalpy_density_norm(t, p, phase) - h3p.f_phase_norm(t, p, phase)
+    return 0.25*enthalpy_density_norm(t, p, phase, squeeze_me, diagonal) - h3p.f_phase_norm(t, p, phase, squeeze_me, diagonal)
 
 def alpha_pt_AB_norm(t, p):
 
