@@ -9,9 +9,125 @@ Created on Thu Nov 27 19:03:31 2025
 
 # import math
 import numpy as np
-import he3_tools as he3
+import he3_tools.he3_constants as h3c
+import he3_tools.he3_props as h3p
 
-he3.set_default("DEFAULT_T_SCALE", 'Greywall')
+# he3.set_default("DEFAULT_T_SCALE", 'Greywall')
+
+def C_V_normal(t, p, squeeze_me=True, diagonal=False):
+    """
+    Normal phase specific heat in units J / K / nm$^3$, with strong coupling 
+    corrections included.  Uses formula (2.13) from Vollhardt & Woelfle.
+    $$
+    C_V = \frac{\pi^2}{3} N_F k_B^2 T
+    $$
+    where $N_F$ is the total density of states, including the spin sum.
+
+    Parameters
+    ----------
+    t : float, int, numpy.ndarray (1D)
+        Reduced temperature, $T/T_c$.
+    p : float, int, numpy.ndarray (1D)
+        Pressure in bar.
+
+
+    Returns
+    -------
+    float or numpy.ndarray
+        Normal phase specific heat at temperature $t$ and pressure $p$. 
+        If both t and p are 1D arrays of length greater than 1, the return 
+        value has shape (len(t), len(p))
+
+    """
+    
+    # Remember that N0 is the single-spin density of states
+    c_scale =  np.pi**2 * (2*h3p.N0(p)) * h3c.kB**2 *(h3p.Tc_K(p)) / 3 
+    t = np.atleast_1d(t)
+    p = np.atleast_1d(p)
+    # c_v =np.outer(t, np.pi**2 * f_scale(p) / (Tc_mK(p)/1000))
+    if diagonal:
+        c_v = t * c_scale
+    else:
+        c_v = np.outer(t, c_scale)    
+            
+    if squeeze_me:
+        c_v = np.squeeze(c_v)
+
+    try:
+        c_v = float(c_v)
+    except:
+        pass
+
+    # return  np.pi**2 * f_scale(p) / (Tc_mK(p)/1000) * t
+    return c_v
+
+def delta_C_V_Tc(p, phase):
+    """
+    Jump in specific heat at superfluid phase transition in units J / K / nm$^3$, 
+    with strong coupling corrections included.  Uses formula (3.78) from 
+    Vollhardt & Woelfle.
+    $$
+    \Delta C_V = \frac{1} N(0) \frac{\partial}{\partial T} \langle \Delta_{\bf k}^\dagger \Delta_{\bf k} \rangle_{\hat{\bf k}}
+    $$
+
+    Parameters
+    ----------
+    p : float, int, numpy.ndarray
+        Pressure in bar.
+    phase : str
+        Phase string, e.g. "A", "B".
+        
+
+    Returns
+    -------
+    float or numpy.ndarray
+        Specific heat jump at pressure p.
+
+    """
+    return  0.25 * h3p.f_scale(p) / (h3p.Tc_K(p) * h3p.beta_phase_norm(1, p, phase))
+
+def C_V(t, p, phase):
+    """
+    Specific heat in given phase, with strong coupling 
+    corrections included.  Uses formula (3.77) from Vollhardt & Woelfle.
+    $$
+    C_V = C_N + \Delta C_V
+    $$
+    Below $T_c$ (i.e. for t < 1) it uses the emperical observation that the 
+    specific heat deecreases apprximately as $t^3$.
+
+    Units:  units J / K / nm$^3$
+
+    Parameters
+    ----------
+    t : float, int, numpy.ndarray
+        Reduced temperature, $T/T_c$.
+    p : float, int, numpy.ndarray
+        Pressure in bar.
+
+    If both t and p are arrays, then C_V is 2D array.
+
+    Returns
+    -------
+    float or numpy.ndarray
+        Specific heat at temperature $t$ and pressure p.
+
+    """
+    t = np.atleast_1d(t)
+    p = np.atleast_1d(p)
+    
+    c_v = np.outer(t**3, C_V_normal(1,p) + delta_C_V_Tc(p, phase) )
+        
+    c_v[t>1,:] = C_V_normal(t[t>1], p, squeeze_me=False)
+
+    # c_v = np.squeeze(c_v)
+    
+    # try:
+    #     c_v = float(c_v)
+    # except:
+    #     pass
+    
+    return h3p.squeeze_float(c_v)
 
 # ===============================
 # Coefficients from Table IV
@@ -129,8 +245,8 @@ def specific_heat_Greywall(V, T):
     Cv[~low_T] = specific_heat_high(V, T[~low_T])
     return Cv
 
-def specific_heat_normal_liquid(T, p, units='default', T_K_lowest= 0.007):
-    """
+def specific_heat_normal_liquid(T, p, units='default', T_K_lowest=0.007):
+    r"""
     Selects Eq. (7) for T < 0.1 K and Eq. (8) for T >= 0.1 K.
     Inputs:
         T (float): temperature (K)
@@ -143,6 +259,7 @@ def specific_heat_normal_liquid(T, p, units='default', T_K_lowest= 0.007):
         default: J /  K nm^3
         SI: J / K m^3
         R: divided by gas constant R
+        dimless: J/K in $k_B$, length unit $\xi_{GL}(0)$
 
     """
     T = np.atleast_1d(T)
@@ -150,10 +267,10 @@ def specific_heat_normal_liquid(T, p, units='default', T_K_lowest= 0.007):
     low_T = (0.007 <= T) & (T <= 0.1)
     high_T = 0.1 < T
     Cv = np.zeros_like(T)
-    V = he3.molar_vol_cm3(p)
+    V = h3p.molar_vol_cm3(p)
     V_m3 = V * (1e-2)**3
     if np.any(vlow_T):
-        Cv[vlow_T] = he3.C_V_normal(T[vlow_T]/he3.Tc_K(p), p) * (he3.N_A/he3.npart(0))/he3.R
+        Cv[vlow_T] = C_V_normal(T[vlow_T]/h3p.Tc_K(p), p) * (h3c.N_A/h3p.npart(0))/h3c.R
     if np.any(low_T):
         Cv[low_T] = specific_heat_low(V, T[low_T])  
     if np.any(high_T):
@@ -162,8 +279,10 @@ def specific_heat_normal_liquid(T, p, units='default', T_K_lowest= 0.007):
     if units == 'R':
         factor = 1.0
     elif units == 'SI':
-        factor = he3.c.R / V_m3
+        factor = h3c.R / V_m3
+    elif units == 'dimless':
+        factor = (h3c.R/h3c.kB) / V_m3 * (h3p.xi(0, p)*1e-9)**3
     else: # he3_tools uses J / K / nm^3
-        factor = he3.c.R / V_m3 * (1e-9)**3
+        factor = h3c.R / V_m3 * (1e-9)**3
             
     return Cv*factor

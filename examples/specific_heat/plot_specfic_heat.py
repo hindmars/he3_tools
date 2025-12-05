@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import scipy.optimize as spo
 
 import he3_tools as he3
-import he3_specific_heat as c
+# import he3_specific_heat as c
 
 #%%
 
@@ -41,7 +41,7 @@ fig, ax = plt.subplots(figsize=(5, 5))
 
 for p, V in zip(p_arr, V_arr):
     T_arr = np.linspace(he3.Tc_K(p), 2.5, 100)
-    ax.plot(T_arr, c.specific_heat_normal_liquid(T_arr, p, units='R', T_K_lowest=1e-3), label = f'{V:.2f}')
+    ax.plot(T_arr, he3.specific_heat_normal_liquid(T_arr, p, units='R', T_K_lowest=1e-3), label = f'{V:.2f}')
 
 ax.set_xlabel(r'$T/$K')
 ax.set_ylabel(r'$C_V/R$')

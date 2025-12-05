@@ -8,7 +8,7 @@ Created on Fri Sep 10 15:04:39 2021
 
 import numpy as np
 # import scipy.linalg as sl
-import pandas as pd
+# import pandas as pd
 import numpy.polynomial as nppoly
 
 import he3_tools.he3_bases as h3b
@@ -17,8 +17,8 @@ import he3_tools.he3_data as h3d
 # import he3_matrix as h3m
 
 SET_T_SCALE= {"Greywall", "PLTS"}
-# DEFAULT_T_SCALE="Greywall" 
-DEFAULT_T_SCALE="PLTS" 
+DEFAULT_T_SCALE="Greywall" 
+# DEFAULT_T_SCALE="PLTS" 
 
 sc_corrs_interp = {"RWS19", "RWS19-interp", "Wiman-thesis", "Choi-interp"}
 sc_corrs_poly = {"RWS19-poly", "Choi-poly", "WS15", "WS15-poly"}
@@ -867,215 +867,214 @@ def TAB_mK(p):
     
 #     return (np.pi**2/3) * h.N0(p) * h.kB**2 *( h.Tc_mK(p)/1000) * t    
 
-def C_V_normal(t, p, squeeze_me=True, diagonal=False):
-    """
-    Normal phase specific heat in units J / K / nm$^3$, with strong coupling 
-    corrections included.  Uses formula (2.13) from Vollhardt & Woelfle.
-    $$
-    C_V = \frac{\pi^2}{3} N_F k_B^2 T
-    $$
-    where $N_F$ is the total density of states, including the spin sum.
+# def C_V_normal(t, p, squeeze_me=True, diagonal=False):
+#     """
+#     Normal phase specific heat in units J / K / nm$^3$, with strong coupling 
+#     corrections included.  Uses formula (2.13) from Vollhardt & Woelfle.
+#     $$
+#     C_V = \frac{\pi^2}{3} N_F k_B^2 T
+#     $$
+#     where $N_F$ is the total density of states, including the spin sum.
 
-    Parameters
-    ----------
-    t : float, int, numpy.ndarray (1D)
-        Reduced temperature, $T/T_c$.
-    p : float, int, numpy.ndarray (1D)
-        Pressure in bar.
+#     Parameters
+#     ----------
+#     t : float, int, numpy.ndarray (1D)
+#         Reduced temperature, $T/T_c$.
+#     p : float, int, numpy.ndarray (1D)
+#         Pressure in bar.
 
 
-    Returns
-    -------
-    float or numpy.ndarray
-        Normal phase specific heat at temperature $t$ and pressure $p$. 
-        If both t and p are 1D arrays of length greater than 1, the return 
-        value has shape (len(t), len(p))
+#     Returns
+#     -------
+#     float or numpy.ndarray
+#         Normal phase specific heat at temperature $t$ and pressure $p$. 
+#         If both t and p are 1D arrays of length greater than 1, the return 
+#         value has shape (len(t), len(p))
 
-    """
+#     """
     
-    # Remember that N0 is the single-spin density of states
-    c_scale =  np.pi**2 * (2*N0(p)) * h3c.kB**2 *(Tc_mK(p)/1000) / 3 
-    t = np.atleast_1d(t)
-    p = np.atleast_1d(p)
-    # c_v =np.outer(t, np.pi**2 * f_scale(p) / (Tc_mK(p)/1000))
-    if diagonal:
-        c_v = t * c_scale
-    else:
-        c_v = np.outer(t, c_scale)    
+#     # Remember that N0 is the single-spin density of states
+#     c_scale =  np.pi**2 * (2*N0(p)) * h3c.kB**2 *(Tc_mK(p)/1000) / 3 
+#     t = np.atleast_1d(t)
+#     p = np.atleast_1d(p)
+#     # c_v =np.outer(t, np.pi**2 * f_scale(p) / (Tc_mK(p)/1000))
+#     if diagonal:
+#         c_v = t * c_scale
+#     else:
+#         c_v = np.outer(t, c_scale)    
             
-    if squeeze_me:
-        c_v = np.squeeze(c_v)
+#     if squeeze_me:
+#         c_v = np.squeeze(c_v)
 
-    try:
-        c_v = float(c_v)
-    except:
-        pass
+#     try:
+#         c_v = float(c_v)
+#     except:
+#         pass
 
-    # return  np.pi**2 * f_scale(p) / (Tc_mK(p)/1000) * t
-    return c_v
+#     # return  np.pi**2 * f_scale(p) / (Tc_mK(p)/1000) * t
+#     return c_v
 
-def delta_C_V_Tc(p, phase):
-    """
-    Jump in specific heat at superfluid phase transition in units J / K / nm$^3$, 
-    with strong coupling corrections included.  Uses formula (3.78) from 
-    Vollhardt & Woelfle.
-    $$
-    \Delta C_V = \frac{1} N(0) \frac{\partial}{\partial T} \langle \Delta_{\bf k}^\dagger \Delta_{\bf k} \rangle_{\hat{\bf k}}
-    $$
+# def delta_C_V_Tc(p, phase):
+#     """
+#     Jump in specific heat at superfluid phase transition in units J / K / nm$^3$, 
+#     with strong coupling corrections included.  Uses formula (3.78) from 
+#     Vollhardt & Woelfle.
+#     $$
+#     \Delta C_V = \frac{1} N(0) \frac{\partial}{\partial T} \langle \Delta_{\bf k}^\dagger \Delta_{\bf k} \rangle_{\hat{\bf k}}
+#     $$
 
-    Parameters
-    ----------
-    p : float, int, numpy.ndarray
-        Pressure in bar.
-    phase : str
-        Phase string, e.g. "A", "B".
+#     Parameters
+#     ----------
+#     p : float, int, numpy.ndarray
+#         Pressure in bar.
+#     phase : str
+#         Phase string, e.g. "A", "B".
         
 
-    Returns
-    -------
-    float or numpy.ndarray
-        Specific heat jump at pressure p.
+#     Returns
+#     -------
+#     float or numpy.ndarray
+#         Specific heat jump at pressure p.
 
-    """
-    return  0.25 * f_scale(p) / (Tc_mK(p)/1000 * beta_phase_norm(1, p, phase))
+#     """
+#     return  0.25 * f_scale(p) / (Tc_mK(p)/1000 * beta_phase_norm(1, p, phase))
 
-def C_V(t, p, phase):
-    """
-    Specific heat in given phase, with strong coupling 
-    corrections included.  Uses formula (3.77) from Vollhardt & Woelfle.
-    $$
-    C_V = C_N + \Delta C_V
-    $$
-    Below $T_c$ (i.e. for t < 1) it uses the emperical observation that the 
-    specific heat deecreases apprximately as $t^3$.
+# def C_V(t, p, phase):
+#     """
+#     Specific heat in given phase, with strong coupling 
+#     corrections included.  Uses formula (3.77) from Vollhardt & Woelfle.
+#     $$
+#     C_V = C_N + \Delta C_V
+#     $$
+#     Below $T_c$ (i.e. for t < 1) it uses the emperical observation that the 
+#     specific heat deecreases apprximately as $t^3$.
 
-    Units:  units J / K / nm$^3$
+#     Units:  units J / K / nm$^3$
 
-    Parameters
-    ----------
-    t : float, int, numpy.ndarray
-        Reduced temperature, $T/T_c$.
-    p : float, int, numpy.ndarray
-        Pressure in bar.
+#     Parameters
+#     ----------
+#     t : float, int, numpy.ndarray
+#         Reduced temperature, $T/T_c$.
+#     p : float, int, numpy.ndarray
+#         Pressure in bar.
 
-    If both t and p are arrays, then C_V is 2D array.
+#     If both t and p are arrays, then C_V is 2D array.
 
-    Returns
-    -------
-    float or numpy.ndarray
-        Specific heat at temperature $t$ and pressure p.
+#     Returns
+#     -------
+#     float or numpy.ndarray
+#         Specific heat at temperature $t$ and pressure p.
 
-    """
-    t = np.atleast_1d(t)
-    p = np.atleast_1d(p)
+#     """
+#     t = np.atleast_1d(t)
+#     p = np.atleast_1d(p)
     
-    c_v = np.outer(t**3, C_V_normal(1,p) + delta_C_V_Tc(p, phase) )
+#     c_v = np.outer(t**3, C_V_normal(1,p) + delta_C_V_Tc(p, phase) )
         
-    c_v[t>1,:] = C_V_normal(t[t>1], p, squeeze_me=False)
+#     c_v[t>1,:] = C_V_normal(t[t>1], p, squeeze_me=False)
 
-    # c_v = np.squeeze(c_v)
+#     # c_v = np.squeeze(c_v)
     
-    # try:
-    #     c_v = float(c_v)
-    # except:
-    #     pass
+#     # try:
+#     #     c_v = float(c_v)
+#     # except:
+#     #     pass
     
-    return squeeze_float(c_v)
+#     return squeeze_float(c_v)
 
-
-def kappa_0(t, p):
-    """
-    Gas-kinetic expression for thermal conductivity, V&W eqn 2.40.  
+# def kappa_0(t, p):
+#     """
+#     Gas-kinetic expression for thermal conductivity, V&W eqn 2.40.  
     
-    Units: J / ns / nm / K
+#     Units: J / ns / nm / K
 
-    Parameters
-    ----------
-    t : float, int, numpy.ndarray
-        Reduced temperature, $T/T_c$.
-    p : float, int, numpy.ndarray
-        Pressure in bar.
+#     Parameters
+#     ----------
+#     t : float, int, numpy.ndarray
+#         Reduced temperature, $T/T_c$.
+#     p : float, int, numpy.ndarray
+#         Pressure in bar.
 
-    Only one or other of t and p can be an array.
+#     Only one or other of t and p can be an array.
 
-    Returns
-    -------
-    float or numpy.ndarray
-        Gas-kinetic thermal conductivity at temperature $t$ and pressure p.
+#     Returns
+#     -------
+#     float or numpy.ndarray
+#         Gas-kinetic thermal conductivity at temperature $t$ and pressure p.
 
-    """
-    # C_V is in J / K / nm^3, vf is in m/s (also nm/ns), tau_qp is in seconds
-    t = np.atleast_1d(t)
-    p = np.atleast_1d(p)
+#     """
+#     # C_V is in J / K / nm^3, vf is in m/s (also nm/ns), tau_qp is in seconds
+#     t = np.atleast_1d(t)
+#     p = np.atleast_1d(p)
 
-    vf2 = (vf(p))**2 
-    k0 = (1e9/3) * C_V_normal(t, p) * tau_qp(t, p) * vf2[None, :]
+#     vf2 = (vf(p))**2 
+#     k0 = (1e9/3) * C_V_normal(t, p) * tau_qp(t, p) * vf2[None, :]
 
-    k0 = np.squeeze(k0)
+#     k0 = np.squeeze(k0)
 
-    try:
-        k0 = float(k0)
-    except:
-        pass
-    # return (1/3) * C_V_normal(t, p) * (vf(p))**2 * tau_qp(t, p) * 1e9
-    return k0
+#     try:
+#         k0 = float(k0)
+#     except:
+#         pass
+#     # return (1/3) * C_V_normal(t, p) * (vf(p))**2 * tau_qp(t, p) * 1e9
+#     return k0
 
 
-def kappa(t, p):
-    """
-    Experimental low temperature thermal conductivity, Greywall 1984  
+# def kappa(t, p):
+#     """
+#     Experimental low temperature thermal conductivity, Greywall 1984  
     
-    Units:    J / ns / nm / K
+#     Units:    J / ns / nm / K
 
-    Parameters
-    ----------
-    t : float, int, numpy.ndarray
-        Reduced temperature, $T/T_c$.
-    p : float, int, numpy.ndarray
-        Pressure in bar.
+#     Parameters
+#     ----------
+#     t : float, int, numpy.ndarray
+#         Reduced temperature, $T/T_c$.
+#     p : float, int, numpy.ndarray
+#         Pressure in bar.
 
-    Only one or other of t and p can be an array.
+#     Only one or other of t and p can be an array.
 
-    Returns
-    -------
-    float or numpy.ndarray
-        Extrapolated measured thermal conductivity at temperature $t$ and pressure p.
+#     Returns
+#     -------
+#     float or numpy.ndarray
+#         Extrapolated measured thermal conductivity at temperature $t$ and pressure p.
 
-    """
-    t = np.atleast_1d(t)
-    p = np.atleast_1d(p)
+#     """
+#     t = np.atleast_1d(t)
+#     p = np.atleast_1d(p)
 
-    p_data = h3d.data_Gre84_therm_cond[:, 0]
-    kappaT_data = h3d.data_Gre84_therm_cond[:, 4]
-    b_data = h3d.data_Gre84_therm_cond[:, 6]
+#     p_data = h3d.data_Gre84_therm_cond[:, 0]
+#     kappaT_data = h3d.data_Gre84_therm_cond[:, 4]
+#     b_data = h3d.data_Gre84_therm_cond[:, 6]
     
     
-    kappaT0_interp = np.interp(p, p_data, kappaT_data) 
-    a = 1/kappaT0_interp
-    b = np.interp(p, p_data, b_data) 
+#     kappaT0_interp = np.interp(p, p_data, kappaT_data) 
+#     a = 1/kappaT0_interp
+#     b = np.interp(p, p_data, b_data) 
 
-    if get_setting('DEFAULT_T_SCALE') != 'Greywall':
-        tmp_set = get_setting('DEFAULT_T_SCALE')
-        set_default('DEFAULT_T_SCALE', 'Greywall')
-        T = T_mK(t, p)*1e-3
-        set_default('DEFAULT_T_SCALE', tmp_set)
-    else:
-        T = T_mK(t, p)*1e-3
+#     if get_setting('DEFAULT_T_SCALE') != 'Greywall':
+#         tmp_set = get_setting('DEFAULT_T_SCALE')
+#         set_default('DEFAULT_T_SCALE', 'Greywall')
+#         T = T_mK(t, p)*1e-3
+#         set_default('DEFAULT_T_SCALE', tmp_set)
+#     else:
+#         T = T_mK(t, p)*1e-3
 
-    kappaT_interp = 1/(a + b*T)
+#     kappaT_interp = 1/(a + b*T)
 
-    k = kappaT_interp[None, :] / T
+#     k = kappaT_interp[None, :] / T
 
-    k = np.squeeze(k)
+#     k = np.squeeze(k)
     
-    try:
-        k = float(k)
-    except:
-        pass
-    # print(p, T, kappaT_interp)
+#     try:
+#         k = float(k)
+#     except:
+#         pass
+#     # print(p, T, kappaT_interp)
 
-    # Greywall is in erg/sec/cm, convert to J/ns/nm 
-    return k * 1e-7/(1e9 * 1e9 * 1e-2)
+#     # Greywall is in erg/sec/cm, convert to J/ns/nm 
+#     return k * 1e-7/(1e9 * 1e9 * 1e-2)
 
 def gamma_c(p):
     """
