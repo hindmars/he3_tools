@@ -19,6 +19,8 @@ from .he3_hot_blob import *
 from .he3_magnetic import *
 from .he3_matrix import *
 from .he3_props import *
+from .he3_specific_heat import *
+from .he3_thermal_conductivity import *
 
 for x in ["DEFAULT_SC_ADJUST", "DEFAULT_SC_CORRS", "DEFAULT_T_SCALE", "DEFAULT_ALPHA_TYPE"]:
     report_setting(x)

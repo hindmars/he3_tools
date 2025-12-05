@@ -81,9 +81,9 @@ def delta_B_mag_norm_approx(t, p, H):
     bn345 = bn[2] + bn[3] + bn[4]
     bn12345 = bn12 + bn345
     
-    if isinstance(p, float):
+    if isinstance(p, float) or isinstance(p, int) :
 
-        if isinstance(t, float):
+        if isinstance(t, float) or isinstance(t, int) :
 
             if t < 1:
                 if t > tcB2(p, H):
@@ -147,7 +147,7 @@ def delta_B_mag_norm_approx(t, p, H):
         xm[B1] = 3*H*eta[B1]*xp[B1]/(6*al + 8*bn2[B1]*xp[B1]**2 + 8*bn4[B1]*xp[B1]**2)
 
     else:
-        raise ValueError('delta_B2_norm_approx: p must be float or ndarray.\n' + 
+        raise ValueError('delta_B2_norm_approx: p must be int, float or ndarray of ints or floats.\n' + 
                          'Was {}.'.format(type(p)))
 
         
@@ -552,22 +552,34 @@ def critical_radius(t_in, p_in, H=0, sigma=0.95, dim=3):
     
     return np.squeeze((dim-1)*sigma_AB/(f_A_mag_norm - f_B_mag_norm))
 
-def critical_energy(t, p, H=0, sigma=0.95, dim=3):
+def critical_energy(t_in, p_in, H=0, sigma=0.95, dim=3):
     """Energy of thin-wall critical bubble, in nm, with magnetic field.
     Ideally will optionally use function to get surface tension. 
     Uses approximations for free energy and surface energy.
     
     Units: k_B T_c
     """
-    f_B_mag_norm = f_phase_mag_norm('B', t, p, H)
-    f_A_mag_norm = f_phase_mag_norm('A', t, p, H)
     
-    r_c = critical_radius(t, p, H, sigma, dim)
-    sigma_AB = surface_energy_AB_approx(t, p, H, sigma)
     
-    Ec = 4*np.pi*(r_c**2*sigma_AB + (1/3)*r_c**3*(f_B_mag_norm - f_A_mag_norm) )
+    t_in = np.atleast_1d(t_in)
+    p_in = np.atleast_1d(p_in)
+    # f_B_mag_norm = np.zeros_like(t_in)
+    # f_A_mag_norm = np.zeros_like(t_in)
+    in_shape = (len(t_in), len(p_in))
+    # f_B_mag_norm = np.zeros(in_shape)
+    # f_A_mag_norm = np.zeros(in_shape)
+    Ec = np.zeros(in_shape)
     
-    return Ec * h3p.f_scale(p)/(h3c.kB * h3p.Tc_mK(p)*1e-3)
+    for m, t in enumerate(t_in):
+        for n, p in enumerate(p_in):
+            f_B_mag_norm = f_phase_mag_norm('B', t, p, H)
+            f_A_mag_norm = f_phase_mag_norm('A', t, p, H)
+            sigma_AB = sigma*np.abs(f_B_mag_norm)*h3p.xi(t, p)
+            r_c = critical_radius(t, p, H, sigma, dim)
+    
+            Ec[m, n] = 4*np.pi*(r_c**2*sigma_AB + (1/3)*r_c**3*(f_B_mag_norm - f_A_mag_norm) )
+    
+    return np.squeeze(Ec * h3p.f_scale(p)/(h3c.kB * h3p.Tc_mK(p)*1e-3))
 
 def delta_tAB_mag_expt(p, H):
     

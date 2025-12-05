@@ -241,7 +241,12 @@ def npart(p):
     """Particle density at pressure p bar ($nm^{-3}$).
     """
     # return np.interp(p, p_nodes, np_data)
-    return np.interp(p, h3d.p_nodes, h3d.np_data)
+    return np.interp(p, h3d.p_nodes, h3d.np_data, left=0.5*h3d.np_data[0], right=2.0*h3d.np_data[-1])
+
+def molar_vol_cm3(p):
+    """Molar volume at pressure p bar ($cm^{3}$).
+    """
+    return (1e-7)**3 * h3c.N_A / npart(p)
 
 def mstar_m(p):
     """Effective mass ratio at pressure p bar.
@@ -694,7 +699,7 @@ def mat_pars(t,p):
 def beta_phase_norm(t, p, phase, squeeze_me=True, diagonal=False):
     """Effective single beta parameter in a given phase.
     """
-    print('t', t, 'p', p)
+    # print('t', t, 'p', p)
     return np.sum( (beta_norm_asarray(t, p, squeeze_me, diagonal).T * h3b.R_dict[phase]).T, axis=0) 
 
 def f_phase_norm(t, p, phase, squeeze_me=True, diagonal=False):
@@ -784,17 +789,17 @@ def f_planar_norm(t, p, squeeze_me=True, diagonal=False):
     # return -0.25* alpha_norm(t)**2 /( beta_planar_norm(t, p).T).T
     return f_phase_norm(t, p, 'planar', squeeze_me, diagonal)    
 
-def delta_A_norm(t, p):
+def delta_A_norm(t, p, squeeze_me=True, diagonal=False):
     """Gap parameter for A phase, normalised to (kB * Tc)
     """    
     # return np.sqrt(- alpha_norm(t)/(2 * beta_A_norm(t,p)).T).T
-    return delta_phase_norm(t, p, 'A')
+    return delta_phase_norm(t, p, 'A', squeeze_me, diagonal)
 
-def delta_B_norm(t, p):
+def delta_B_norm(t, p, squeeze_me=True, diagonal=False):
     """Gap parameter for B phase, normalised to (kB * Tc)
     """
     # return  np.sqrt(- alpha_norm(t)/(2 * beta_B_norm(t, p)).T).T
-    return delta_phase_norm(t, p, 'B')
+    return delta_phase_norm(t, p, 'B', squeeze_me, diagonal)
 
 def delta_planar_norm(t, p):
     """Gap parameter for planar phase, normalised to (kB * Tc)
@@ -1018,7 +1023,7 @@ def kappa_0(t, p):
 
 def kappa(t, p):
     """
-    Experimental thermal conductivity, Greywall 1984  
+    Experimental low temperature thermal conductivity, Greywall 1984  
     
     Units:    J / ns / nm / K
 
@@ -1034,17 +1039,20 @@ def kappa(t, p):
     Returns
     -------
     float or numpy.ndarray
-        Measured thermal conductivity at temperature $t$ and pressure p.
+        Extrapolated measured thermal conductivity at temperature $t$ and pressure p.
 
     """
     t = np.atleast_1d(t)
     p = np.atleast_1d(p)
 
-    p_data = h3d.data_Gre86_therm_cond[:, 0]
-    kappaT_data = h3d.data_Gre86_therm_cond[:, 4]
+    p_data = h3d.data_Gre84_therm_cond[:, 0]
+    kappaT_data = h3d.data_Gre84_therm_cond[:, 4]
+    b_data = h3d.data_Gre84_therm_cond[:, 6]
     
-    # Greywall is in erg/sec/cm, convert to J/ns/nm 
-    kappaT_interp = np.interp(p, p_data, kappaT_data) * 1e-7/(1e9 * 1e9 * 1e-2)
+    
+    kappaT0_interp = np.interp(p, p_data, kappaT_data) 
+    a = 1/kappaT0_interp
+    b = np.interp(p, p_data, b_data) 
 
     if get_setting('DEFAULT_T_SCALE') != 'Greywall':
         tmp_set = get_setting('DEFAULT_T_SCALE')
@@ -1053,6 +1061,8 @@ def kappa(t, p):
         set_default('DEFAULT_T_SCALE', tmp_set)
     else:
         T = T_mK(t, p)*1e-3
+
+    kappaT_interp = 1/(a + b*T)
 
     k = kappaT_interp[None, :] / T
 
@@ -1064,7 +1074,8 @@ def kappa(t, p):
         pass
     # print(p, T, kappaT_interp)
 
-    return k
+    # Greywall is in erg/sec/cm, convert to J/ns/nm 
+    return k * 1e-7/(1e9 * 1e9 * 1e-2)
 
 def gamma_c(p):
     """

@@ -290,8 +290,18 @@ Tmelt_poly_PLTS_lo = nppoly.Polynomial(b_melt_lo) # convert to bar
 data_Tan91_mag_supp_B = np.loadtxt(os.path.join(BASE_DIR, 'Tan+91_table1.csv'), delimiter=',', skiprows=2)
 
 ###############################################################################################################
-##########            Greywall PRB 1986 Thermal conductivity              ###############
+##########            Greywall PRB 1984 Thermal conductivity              ###############
 ###############################################################################################################
 
-data_Gre86_therm_cond = np.loadtxt(os.path.join(BASE_DIR, 'Greywall_1986_TableV_data.csv'), delimiter=',', skiprows=1)
+data_Gre84_therm_cond = np.loadtxt(os.path.join(BASE_DIR, 'Greywall_1986_TableV_data.csv'), delimiter=',', skiprows=1)
 
+a_Gre84_table3 = [    [-4.1884746e+01, 1.9262839e+00, 0.0000000e+00],    
+                    [-1.8546379e+00, 2.3695190e-01, -6.8284756e-03],    
+                    [4.3617792e-01, -4.2101673e-02, 1.0050221e-03],    
+                    [-9.4328296e-02, 8.9196267e-03, -2.0903165e-04],]
+
+b_Gre84_table3 = [    [2.5498997e+00, -1.1861905e-01, 1.7187787e-03],    
+                    [-1.4861472e+02, 7.2176329e+00, -7.5439157e-02],    
+                    [1.0311239e+03, -4.1084636e+01, 6.8188534e-01],    
+                    [-3.3746517e+03, 2.2612612e+02, -3.4207801e+00],
+                    [ 2.5913792e+03, -1.4574998e+02,  2.1389643e+00]]

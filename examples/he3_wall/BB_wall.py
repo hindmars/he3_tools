@@ -20,9 +20,11 @@ savefig=False
 p = 15
 t = 0.8
 
-N, L_xi = (500, 50)
+# N, L_xi = (500, 50)
+N, L_xi0 = (200, 50)
+dx_xi0 = L_xi0/N
 
-w = 25. * h.xi(t,p)
+w = L_xi0 * h.xi(0,p)
 
 B_phases = ['B'+ str(x) for x in range(1,8)]
 
@@ -31,7 +33,7 @@ ax_dict = {}
 
 for right_phase in B_phases:
     print(right_phase)
-    Apg_dict[right_phase] = hw.krylov_BB(t, p, gr_pars=(N,L_xi), 
+    Apg_dict[right_phase] = hw.krylov_BB(t, p, gr_pars=(N,L_xi0), 
                            left_phase='B', 
                            right_phase=right_phase,
                            bcs = [hw.bc_neu, hw.bc_neu])
@@ -41,7 +43,7 @@ for right_phase in B_phases:
 for right_phase in B_phases:
     ax_dict[right_phase] = hw.plot_wall(*Apg_dict[right_phase], 
                       real_comp_list=[(0,0), (1,1), (2,2)],
-                      imag_comp_list=[], title_extra= ', B' + right_phase, 
+                      imag_comp_list=[], title_extra= ', B' + right_phase + rf'$dx = {dx_xi0:.1f}$', 
                       plot_gap=True,
                       phase_marker=True)
 
