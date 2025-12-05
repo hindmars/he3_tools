@@ -202,17 +202,21 @@ def thermal_conductivity_Greywall84(V, T):
 
 def thermal_conductivity_normal_liquid(T, p, units='default', T_K_lowest= 0.007):
     """
+    Thermal conductivity from Greywall 1984.
     Selects Eq. (6) for T < 0.05 K and Eq. 7) for T >= 0.05 K.
     Inputs:
         T (float): temperature (K)
         p : pressure (bar)
-    Returns:
-        kappa (float): thermal conductivity in 
-
+    units:
         default: J / ns nm K
         SI: J / s m K
         cgs: erg/sec cm K
         dimless: J / K in k_B, length unit xlGL(0), time unit xiGL(0)/vF
+    T_K_lowest: (K) switch to theoretical below this temp
+
+    Returns:
+        kappa (float): thermal conductivity in chosen units
+
     """
     T = np.atleast_1d(T)
     vlow_T = T < T_K_lowest

@@ -247,19 +247,20 @@ def specific_heat_Greywall(V, T):
 
 def specific_heat_normal_liquid(T, p, units='default', T_K_lowest=0.007):
     r"""
+    Specific Heat from Greywall 1983. 
     Selects Eq. (7) for T < 0.1 K and Eq. (8) for T >= 0.1 K.
     Inputs:
         T (float): temperature (K)
         p : pressure (bar)
+        units:            
+            default: J /  K nm^3
+            SI: J / K m^3
+            R: divided by gas constant R
+            dimless: J/K in $k_B$, length unit $\xi_{GL}(0)$
+        T_K_lowest: (K) switch to theoretical below this temp
+
     Returns:
-        Cv (float): volumetric specific heat from the empirical fit.
-        
-        Units:
-            
-        default: J /  K nm^3
-        SI: J / K m^3
-        R: divided by gas constant R
-        dimless: J/K in $k_B$, length unit $\xi_{GL}(0)$
+        Cv (float): volumetric specific heat in chosen units
 
     """
     T = np.atleast_1d(T)
