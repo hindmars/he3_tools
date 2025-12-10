@@ -11,8 +11,13 @@ He3 phase boundary solutions
 import numpy as np
 import he3_tools as h
 import he3_tools.he3_wall as hw
+import pickle as pkl
 
 h.set_default("DEFAULT_T_SCALE", "Greywall")
+
+#%%
+savefig=False
+pickle = False
 
 #%% Set pressure and rduced temperature
 
@@ -24,8 +29,7 @@ t = h.tAB(p)
 #%% Lattice size: grid points and physical llength
 
 # N, L_xi = (500, 25)
-N, L_xi0 = (50, 50)
-savefig=False
+N, L_xi0 = (128, 64)
 
 #%% Get wall solution
 
@@ -60,5 +64,19 @@ ax2[2].legend(fontsize='small', bbox_to_anchor=(0.9, 0.5))
 if savefig:
     file_name = 'AB_wall_t={:.2f}_p={:.1f}.pdf'.format(t,p)
     print('print to figure',file_name)
-    ax[0].get_figure().savefig(file_name)
+    ax2[0].get_figure().savefig(file_name)
+
+#%% pickle the data
+
+if pickle:
+    data_dict = {}
+    
+    data_dict['A'] = Apg_kry[0]
+    data_dict['physics params'] = Apg_kry[1].mat_pars.__dict__
+    data_dict['grid'] = Apg_kry[2].__dict__
+    
+    filename = f'AB_wall_data_p{p:}.pkl'
+    
+    with open(filename, 'wb') as f:
+        pkl.dump(data_dict, f)
 
