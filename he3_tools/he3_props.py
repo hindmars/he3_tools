@@ -20,7 +20,7 @@ SET_T_SCALE= {"Greywall", "PLTS"}
 DEFAULT_T_SCALE="Greywall" 
 # DEFAULT_T_SCALE="PLTS" 
 
-sc_corrs_interp = {"RWS19", "RWS19-interp", "Wiman-thesis", "Choi-interp"}
+sc_corrs_interp = {"RWS19", "RWS19-interp", "Wiman-thesis", "Choi-interp", "SS81-interp"}
 sc_corrs_poly = {"RWS19-poly", "Choi-poly", "WS15", "WS15-poly"}
 # SET_SC_CORRS= {"RWS19", "Wiman-thesis", "Choi-interp", "WS15", "Choi-poly"}
 SET_SC_CORRS= sc_corrs_interp.union(sc_corrs_poly)
@@ -137,11 +137,11 @@ def Tc_K(p):
     """
     return Tc_mK_expt(p)*1e-3
 
-def T_mK(t, p):
+def T_mK(t_in, p_in):
     """Converts reduced temperature ($T/T_c$) to temperature in mK.
     """
-    t = np.atleast_1d(t)
-    p = np.atleast_1d(p)
+    t = np.atleast_1d(t_in)
+    p = np.atleast_1d(p_in)
     Tc_mK_arr = np.outer(t, Tc_mK_expt(p))
     
     return squeeze_float(Tc_mK_arr)
@@ -283,11 +283,11 @@ def F0a(p):
     """Landau parameter $F_0^a$."""
     return h3d.F0a_poly(p)
 
-def xi(t, p, squeeze_me=True, diagonal=False):
+def xi(t_in, p_in, squeeze_me=True, diagonal=False):
     """Ginzburg Landau correlation length at pressure p bar (nm).
     """
-    t = np.atleast_1d(t)
-    p = np.atleast_1d(p)
+    t = np.atleast_1d(t_in)
+    p = np.atleast_1d(p_in)
     
     if diagonal:
         x = 1/(-alpha_norm(t))**0.5 * h3c.xiGL_const*xi0(p)
@@ -300,11 +300,11 @@ def xi(t, p, squeeze_me=True, diagonal=False):
     # return h3c.xiGL_const*xi0(p)/(-alpha_norm(t))**0.5
     return x
 
-def xi_delta(t, p, squeeze_me=True, diagonal=False):
+def xi_delta(t_in, p_in, squeeze_me=True, diagonal=False):
     """BCS correlation length at pressure p bar (nm).
     """
-    t = np.atleast_1d(t)
-    p = np.atleast_1d(p)
+    t = np.atleast_1d(t_in)
+    p = np.atleast_1d(p_in)
     
     if diagonal:
         x = 1/(-alpha_bcs(t))**0.5 * h3c.xiGL_const*xi0(p)
@@ -508,7 +508,7 @@ def gz(p):
     bn24 = bn[1] + bn[3]
     return (-bn5/bn24)*h3c.lambda_A1/Tc_mK(p)
 
-def H_scale(t, p):
+def H_scale(t_in, p_in):
     r"""
     Magnetic field scale implied by material parameters $\alpha$ and $g_H$, 
     through $H_s^2 \equiv \sqrt{-\alpha/g_H}$).
@@ -526,8 +526,8 @@ def H_scale(t, p):
         Magnetic field in tesla.
 
     """
-    t = np.atleast_1d(t)
-    p = np.atleast_1d(p)
+    t = np.atleast_1d(t_in)
+    p = np.atleast_1d(p_in)
 
     h_s = np.sqrt(np.outer(-alpha_norm(t),1/gH(p)))
     
@@ -620,10 +620,10 @@ def alpha_bcs(t):
     """
     return (t**h3c.a_bcs - 1 )/h3c.a_bcs
 
-def alpha_norm(t, squeeze_me=True):
+def alpha_norm(t_in, squeeze_me=True):
     """Quadratic material parameter
     """
-    t = np.atleast_1d(t)
+    t = np.atleast_1d(t_in)
     if DEFAULT_ALPHA_TYPE == "GL":
         a = t - 1
     elif DEFAULT_ALPHA_TYPE == "BCS":
@@ -649,12 +649,12 @@ def beta_wc_norm_asarray():
     beta_wc_norm_list = [ beta_wc_norm(n) for n in range(1,6)]
     return np.array(beta_wc_norm_list)
 
-def delta_beta_norm(t, p, n):
+def delta_beta_norm(t_in, p_in, n):
     """Strong coupling correction to material parameter beta(n), 
     with units of f_scale/(2 * np.pi * kB * Tc)**2
     """ 
-    t = np.atleast_1d(t)
-    p = np.atleast_1d(p)
+    t = np.atleast_1d(t_in)
+    p = np.atleast_1d(p_in)
     t_db = np.outer(t, delta_b(p, n))
 
     return squeeze_float(t_db)
@@ -663,14 +663,14 @@ def delta_beta_norm_asarray(t, p):
     delta_beta_norm_list = [ delta_beta_norm(t, p, n) for n in range(1,6)]
     return np.array(delta_beta_norm_list)
 
-def beta_norm(t, p, n, squeeze_me=True, diagonal=False):
+def beta_norm(t_in, p_in, n, squeeze_me=True, diagonal=False):
     """Complete material parameter including strong coupling correction, within units of 
     f_scale/(2 * np.pi * kB * Tc)**2
     """ 
     b = b_wc(n)
     
-    t = np.atleast_1d(t)
-    p = np.atleast_1d(p)
+    t = np.atleast_1d(t_in)
+    p = np.atleast_1d(p_in)
     
     if diagonal:
         t_db = t * delta_b(p, n)
@@ -702,11 +702,11 @@ def beta_phase_norm(t, p, phase, squeeze_me=True, diagonal=False):
     # print('t', t, 'p', p)
     return np.sum( (beta_norm_asarray(t, p, squeeze_me, diagonal).T * h3b.R_dict[phase]).T, axis=0) 
 
-def f_phase_norm(t, p, phase, squeeze_me=True, diagonal=False):
+def f_phase_norm(t_in, p_in, phase, squeeze_me=True, diagonal=False):
     """Normalised free energy in a given phase.
     """
-    t = np.atleast_1d(t)
-    p = np.atleast_1d(p)
+    t = np.atleast_1d(t_in)
+    p = np.atleast_1d(p_in)
 
     if diagonal:
         f = -0.25* alpha_norm(t)**2 /( beta_phase_norm(t, p, phase, squeeze_me=False, diagonal=True))
@@ -720,24 +720,25 @@ def f_phase_norm(t, p, phase, squeeze_me=True, diagonal=False):
         
     return f
 
-def delta_phase_norm(t, p, phase, squeeze_me=True, diagonal=False):
+def delta_phase_norm(t_in, p_in, phase, squeeze_me=True, diagonal=False):
     """Normalised gap parameter in a given phase.
     """
-    t = np.atleast_1d(t)
-    p = np.atleast_1d(p)
-    t[t>1.0] = 1.0
+    t = np.atleast_1d(t_in)
+    p = np.atleast_1d(p_in)
     
     if diagonal:
-        d = np.sqrt(- alpha_norm(t)/(2 * beta_phase_norm(t, p, phase, squeeze_me=False, diagonal=True)))
+        d2 = - alpha_norm(t)/(2 * beta_phase_norm(t, p, phase, squeeze_me=False, diagonal=True))
     else:
-        d = np.sqrt(- alpha_norm(t[:, None])/(2 * beta_phase_norm(t, p, phase, squeeze_me=False)))
+        d2 = - alpha_norm(t[:, None])/(2 * beta_phase_norm(t, p, phase, squeeze_me=False))
 
+    d2[d2 < 0.0] = 0.0
+    d = np.sqrt(d2)
     if squeeze_me:
         d = squeeze_float(d)
     return d
 
-def delta_wc(t):
-    t = np.atleast_1d(t)
+def delta_wc(t_in):
+    t = np.atleast_1d(t_in)
     t[t>1.0] = 1.0
     return np.sqrt(- alpha_norm(t)/(2 * h3c.beta_const))
 

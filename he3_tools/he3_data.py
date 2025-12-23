@@ -112,6 +112,18 @@ def get_interp_data_choi():
 
     return [p_choi, c_choi_list]
 
+def get_interp_data_ss81():
+    """ Sauls and Serene Physical Review B 24, 183 (1981), Table II."""
+    p_nodes = [0, 12, 16, 20, 24, 28, 34.4]
+    c1 = [0, -0.034, -0.041, -0.048, -0.056, -0.062, -0.074]
+    c2 = [0, -0.080, -0.088, -0.095, -0.101, -0.105, -0.103]
+    c3 = [0, -0.117, -0.128, -0.136, -0.140, -0.139, -0.123]
+    c4 = [0, -0.199, -0.229, -0.254, -0.273, -0.286, -0.298]
+    c5 = [0, -0.195, -0.235, -0.277, -0.321, -0.369, -0.469]
+    c_list = [c1, c2, c3, c4, c5]
+
+    return [p_nodes, c_list]
+
 def get_poly_ws15():
     # polynomial coefficients from J. J. Wiman ‚ J. A. Sauls prb 92, 144515 (2015)
     # \Delta{\beta_i^{sc}}/|beta_1^{wc}| = a_n^{i} p^{n}, p in bar
@@ -162,7 +174,8 @@ dbeta_data_dict = { "RWS19" : get_interp_data_rws19(),
                 "Choi-interp" : get_interp_data_choi(),
                 "Choi-poly" : get_poly_choi_this(),
                 "WS15" : get_poly_ws15(),
-                "WS15-poly" : get_poly_ws15()
+                "WS15-poly" : get_poly_ws15(), 
+                "SS81-interp" : get_interp_data_ss81()
                 }
 
 ######################################################################################

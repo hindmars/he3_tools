@@ -124,7 +124,7 @@ b = h3d.b_Gre84_table3
 
 T_pow_a = [0, 1, 2, 3]
 T_pow_b = [-2, -1, 0, 1, 2]
-
+# T in K above which to switch functions from low to high
 T_thresh = 0.05
 
 conv_erg_sec_cm_K_SI = 1e-7 / 1e-2  
@@ -220,8 +220,8 @@ def thermal_conductivity_normal_liquid(T, p, units='default', T_K_lowest= 0.007)
     """
     T = np.atleast_1d(T)
     vlow_T = T < T_K_lowest
-    low_T = (T_K_lowest <= T) & (T <= T_thresh)
-    high_T = T_thresh < T
+    low_T = (T_K_lowest <= T) & (T < T_thresh)
+    high_T = T_thresh <= T
     kappa_arr = np.zeros_like(T)
     V = h3p.molar_vol_cm3(p)
     if np.any(vlow_T):

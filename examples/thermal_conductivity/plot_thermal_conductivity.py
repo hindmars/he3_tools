@@ -40,7 +40,7 @@ print('Pressure equivalents', p_arr)
 fig, ax = plt.subplots(figsize=(4, 5))
 
 for p, V in zip(p_arr, V_arr):
-    T_arr = np.logspace(np.log10(he3.Tc_K(p)), 0.0, 100)
+    T_arr = np.logspace(np.log10(he3.Tc_K(p)), 0.0, 500)
     ax.loglog(T_arr, he3.thermal_conductivity_normal_liquid(T_arr, p, units='cgs', T_K_lowest=1e-3), label = f'{V:.2f}')
 
 ax.set_xlabel(r'$T/$K')
@@ -50,7 +50,11 @@ ax.grid()
 ax.legend(title=r'$V$ [cm$^3$/mol]')
 
 ax.set_xlim(1e-3, 1.0)
+# ax.set_xlim(40/1000, 60/1000)
+
 ax.set_ylim(2e2, 3e4)
+
+# ax.axvline(0.05, ls='--')
 
 #%% 
 

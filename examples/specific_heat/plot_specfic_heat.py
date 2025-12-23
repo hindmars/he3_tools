@@ -45,6 +45,7 @@ for p, V in zip(p_arr, V_arr):
 
 ax.set_xlabel(r'$T/$K')
 ax.set_ylabel(r'$C_V/R$')
+# ax.set_ylabel(r'$C_V$')
 
 ax.grid()
 ax.legend(title=r'$V$ [cm$^3$/mol]')

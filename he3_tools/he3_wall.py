@@ -40,6 +40,7 @@ bc_max_pb = bc_dir
 # Diffuse bcs from Wiman and Sauls 2016, reporting Ambegaokar, de Gennes, Rainer 1975
 b_adgr = 0.54
 bc_diff = [np.array([1, h.xiGL_const, h.xiGL_const]), -np.array([0, b_adgr, b_adgr])]
+# Constants for shift and roll
 bcleft = 0
 bcright = -1
 
@@ -191,7 +192,8 @@ class thin_wall_bubble:
 
 def field_eqn(phi, pot, gr):
     """
-    Scalar field equation in 1 radial dimension, with trivial gradient term.
+    Ginzburg-Landau field equation in 1 dimension, with planar, cylindrical, 
+    or spherical symmetry (gr.dim = 1, 2, 3).
     """
     
     phi_plus = np.roll(phi,-1, axis=0)
@@ -212,7 +214,8 @@ def field_eqn(phi, pot, gr):
     else:
         derivs = second
         
-    return np.matmul(Kxx, derivs) - pot.v_prime(phi)
+    # return np.matmul(Kxx, derivs) - pot.v_prime(phi)
+    return np.matmul(derivs, Kxx) - pot.v_prime(phi)
 
 def find_boundary_condition(bcs, boundary):
     a1 = bcs[boundary][0]
@@ -288,7 +291,7 @@ def phi_shift(phi, direction, gr):
 
 def field_eqn_with_bcs(phi, pot, gr):
     """
-    GL field equation in 1 radial dimension
+    GL field equation in 1 dimension
     """
 
     phi_plus = phi_shift(phi, +1, gr)
@@ -304,7 +307,8 @@ def field_eqn_with_bcs(phi, pot, gr):
     else:
         derivs = second
         
-    return np.matmul(Kxx, derivs) - pot.v_prime(phi)
+    # return np.matmul(Kxx, derivs) - pot.v_prime(phi)
+    return np.matmul(derivs, Kxx) - pot.v_prime(phi)
 
 
 
@@ -378,8 +382,9 @@ def initial_condition_wall(pot, gr, left_phase="A", right_phase="B"):
     
     bub = thin_wall_bubble(pot, dim=gr.dim)
     
-    m2 = 1/pot.mat_pars.xi()
-    k = np.sqrt(m2/4)
+    # m2 = 1/pot.mat_pars.xi()
+    # k = np.sqrt(m2/4)
+    k = 0.5*h.xi(0,p)/pot.mat_pars.xi()
 
     rb = bub.r_bub
     if rb == np.inf:
@@ -581,30 +586,34 @@ def krylov_wall(*args, gr_pars=(200,20), dim=1,
                    bcs = [bc_neu, bc_neu], **kwargs):
     """
     Apply Krylov solver to find wall solution interpolating between left_phase and
-    right_phase. 
+    right_phase, with boundary conditions [bcs_left, bcs_right].
     
-    Returns: order parameter phi, the potential object, and the grid object.
+    Returns: order parameter A, the potential object, and the grid object.
     """
     
     pot = quartic_potential(*args)
     gr = grid_1d(*gr_pars, dim=dim, bcs=bcs)
     
-    phi_init = initial_condition_wall(pot, gr, 
+    A_init = initial_condition_wall(pot, gr, 
                                          left_phase=left_phase, 
                                          right_phase=right_phase)
     
-    def field_eqn_fix(phi):
-        return field_eqn_with_bcs(phi, pot, gr)
+    print('krylov_wall: starting optimisation')
+    
+    def field_eqn_fix(A):
+        return field_eqn_with_bcs(A, pot, gr)
 
     try:
-        phi = newton_krylov(field_eqn_fix, phi_init, **kwargs)
+        A = newton_krylov(field_eqn_fix, A_init, **kwargs)
     except scipy.optimize.NoConvergence as e:
-        phi = e.args[0]
+        A = e.args[0]
         print('No Convergence')
 
-    return phi, pot, gr 
+    return A, pot, gr 
 
-def relax(t_eval, *args, gr_pars=(200,20), dim=1):
+def relax(t_eval, *args, gr_pars=(200,20), dim=1,
+                   left_phase="A", right_phase="B", 
+                   bcs = [bc_neu, bc_neu], **kwargs):
 
     """
     Apply relaxation method to find domain wall solution. 
@@ -615,15 +624,21 @@ def relax(t_eval, *args, gr_pars=(200,20), dim=1):
     
     pot = quartic_potential(*args)
     
-    gr = grid_1d(*gr_pars, dim=dim)
+    pot.mat_pars.p = 28.0
+    pot.mat_pars.t = h.tAB(pot.mat_pars.p)
+    
+    gr = grid_1d(*gr_pars, dim=dim, bcs=bcs)
    
-    phi_init = initial_condition(pot, gr)
+    phi_init = initial_condition_wall(pot, gr, 
+                                         left_phase=left_phase, 
+                                         right_phase=right_phase)
 
     
     def field_eqn_vec(tau, phi_vec):
         force_mat = field_eqn(h.vec2mat(phi_vec), pot, gr)
         return h.mat2vec(force_mat)
 
+    print(f'Relaxing to "time" {max(t_eval):}')
 
     tspan = [min(t_eval), max(t_eval)]
     sol = solve_ivp(field_eqn_vec, tspan, h.mat2vec(phi_init), t_eval=t_eval)
@@ -673,7 +688,7 @@ def energy_density(phi, pot, gr):
     
     return eden_grad + eden_pot, eden_grad, eden_pot
 
-def surface_energy(A, pot, gr):
+def surface_energy(A, pot, gr, zero_point=None):
     """
     Calculates surface energy of configuration, relative to minimum energy density.
     """
@@ -683,8 +698,17 @@ def surface_energy(A, pot, gr):
         bcs = [bc_neu, bc_neu]    
     
     eden, eden_grad, eden_pot = energy_density(A, pot, gr)
-    en = np.trapz(eden - np.min(eden), gr.x)
-    
+    if zero_point is None:
+        eden0 = np.min(eden)
+    elif isinstance(zero_point, str):
+        t_in = pot.mat_pars.t
+        p_in = pot.mat_pars.p
+        eden0 = h.f_phase_norm(t_in, p_in, zero_point)
+    else:
+        eden0 = zero_point
+        
+    en = np.trapz(eden - eden0, gr.x)
+
     if bcs is None:
         n_surface = 1
     else:
@@ -804,9 +828,36 @@ def plot_eigs(A, pot, gr, angm="orbital"):
     return ax
 
 
-def thuneberg_formula(t,p):
+def fcap_thu81_eq_6(t, p, chi):
     """
-    Formula for AB interface free energy from Thuneberg PRB 1991.
+    Formula for $f_c^{ap}$, equation 6. 
+    """
+    beta1 = h.beta_norm(t, p, 1)
+    beta45 = h.beta_norm(t, p, 4) + h.beta_norm(t, p, 5)
+    beta245 = h.beta_norm(t, p, 2) + beta45
+    beta345 = h.beta_norm(t, p, 3) + beta45
+    
+    schi = np.sin(chi)
+    denom = 2*(2*beta245 - 2*beta45*schi**2 + (2*beta1 + beta345)*schi**4)
+    
+    return h.alpha_norm(t)**2/denom
+
+def thuneberg_formula(t,p):
+    r"""
+    Formula for AB interface free energy from Thuneberg PRB 1991, given above 
+    Eq. 7, in units of $\xi_{{GL}}(T) | f_B(T) |$
+
+    """
+    xi_ratio = h.xi(t, p)/h.xi(0, p)
+    
+    return 2.5 * xi_ratio * np.sqrt( (np.abs(h.f_A_norm(t, p))
+                                      - fcap_thu81_eq_6(t, p, np.pi/2) )
+                                    /np.abs(h.f_B_norm(t, p))
+                                    )
+
+def thuneberg_formula_calc(t,p):
+    """
+    Formula for AB interface free energy from Thuneberg PRB 1991, eqs 20 and 21. 
     """
     beta1 = h.beta_norm(t,p,1)
     beta2 = h.beta_norm(t,p,2)
@@ -839,6 +890,8 @@ def thuneberg_formula(t,p):
         
     return square_bracket_20*h.xi(t,p) * h.alpha_norm(t)**2/(4*beta2_0)
 
+
+
 def get_wall(t, p, w, N=500, **kwargs):
     """
     Wrapper for getting AB wall solution at reduced temperature t, pressure p, 
@@ -861,7 +914,23 @@ def plot_wall(A, pot, gr,
               plot_gap=False, 
               phase_marker=False,
               total_energy=False,
-              legend_loc='center right', title_extra=''):
+              legend=True,
+              legend_loc='center right', 
+              title_extra='',
+              ax=None,
+              **kwargs
+              ):
+
+    if legend:
+        label_pre = ''
+    else:
+        label_pre = '_'
+    print('lebal_pre', label_pre)
+    
+    
+    if ax is None:
+        fig, ax = plt.subplots(3,1, figsize=(5,6), sharex='col')
+
     comp_key = ('x', 'y', 'z')
     t = pot.mat_pars.t
     p = pot.mat_pars.p
@@ -902,43 +971,44 @@ def plot_wall(A, pot, gr,
                 
         
         
-    fig, ax = plt.subplots(3,1, figsize=(5,6), sharex='col')
+    # fig, ax = plt.subplots(3,1, figsize=(5,6), sharex='col')
     # gridspec_kw={'hspace': 0, 'wspace': 0}
-    ax[0].plot(x, eden/abs(f_B_mag_norm) + 1, label="Total")
-    ax[0].plot(x, eden_pot/abs(f_B_mag_norm) + 1, label="Bulk")
+    ax[0].plot(x, eden/abs(f_B_mag_norm) + 1, label=label_pre + "Total", c=h.alt_colorblind_list[0], **kwargs)
+    ax[0].plot(x, eden_pot/abs(f_B_mag_norm) + 1, label=label_pre + "Bulk", c=h.alt_colorblind_list[1], **kwargs)
     
     ax[0].set_ylabel(r'$e/|f_B|+1$')
-    ax[0].grid()
+    ax[0].grid(True)
     ax[0].set_xlim(xmin, xmax)
     # ax[0].legend(loc='center right', title=r'Excess over $f_B$')
-    ax[0].legend(bbox_to_anchor=(1.025, 0.5, 0.25, 0.5), title=r'Excess over $f_B$')
+    if legend:
+        ax[0].legend(bbox_to_anchor=(1.025, 0.5, 0.25, 0.5), title=r'Excess over $f_B$')
     title_string = r't = {:.3f}, T={:.2f} mK, p={:.1f} bar, H={:.2f} T' + '\n' \
-        + r' $\xi_{{\rm GL}}(T) = {:.1f}$ nm, $\sigma/\xi_{{\rm GL}}(T)|f_B(T)| = {:.2f}$'\
+        + r' $\xi_{{\rm GL}}(T) = {:.1f}$ nm, $\sigma/\xi_{{\rm GL}}(T)|f_B(T)| = {:.3f}$'\
         + title_extra
     
     norm =  np.sqrt(3)/h.delta_B_norm(t, p) 
     
     for comp in real_comp_list:
         ax[1].plot(x, norm*A[:, comp[0], comp[1]].real, 
-                   label=r'${{\rm Re}}(A_{{ {} {} }})$'.format(comp_key[comp[0]], comp_key[comp[1]])
+                   label=label_pre + r'${{\rm Re}}(A_{{ {} {} }})$'.format(comp_key[comp[0]], comp_key[comp[1]]),
+                   **kwargs
                    )
     for comp in imag_comp_list:
         ax[1].plot(x, norm*A[:, comp[0], comp[1]].imag, 
-                   label=r'${{\rm Im}}(A_{{ {} {} }})$'.format(comp_key[comp[0]], comp_key[comp[1]])
+                   label=label_pre + r'${{\rm Im}}(A_{{ {} {} }})$'.format(comp_key[comp[0]], comp_key[comp[1]]),
+                   **kwargs
                    )
     
     for n, r_term in enumerate(r_terms[:5]):
-        ax[2].plot(x, r_term, label=rf'$R_{n+1:}(A)$', c=h.ibm_colorblind_list[n])
-    
-    # ax[1].plot(x, norm*A[:, 0, 0].real, label=r'${\rm Re}(A_{xx})$')
-    # ax[1].plot(x, norm*A[:, 1, 1].real, label=r'${\rm Re}(A_{yy})$')
-    # ax[1].plot(x, norm*A[:, 2, 2].real, label=r'${\rm Re}(A_{zz})$')
-    # ax[1].plot(x, norm*A[:, 0, 1].imag, label=r'${\rm Im}(A_{xy})$')
-    # ax[1].plot(x, norm*A[:, 1, 0].imag, label=r'${\rm Im}(A_{yx})$')
-    
+        ax[2].plot(x, r_term, 
+                   label=label_pre + rf'$R_{n+1:}(A)$', 
+                   c=h.ibm_colorblind_list[n], 
+                   **kwargs)
+        
     if plot_gap:
-        # ax[1].plot(x, np.gradient(norm*h.norm(A, 2), x), 'k--', label=r'$||A||^2$')
-        ax[1].plot(x, norm*h.norm(A), 'k--', label=r'$||A||$')
+        ax[1].plot(x, norm*h.norm(A), 'k--', 
+                   label=label_pre + r'$||A||$', 
+                   **kwargs)
     
     # thresh=1/12
     
@@ -954,6 +1024,11 @@ def plot_wall(A, pot, gr,
 
         phase_color_list = h.alt_colorblind_list + [None]
 
+        if 'alpha' in kwargs:
+            alpha = kwargs['alpha']
+        else:
+            alpha = 1.0
+
         for n in range(len(x[:-1])):
         
             # ax[2].fill_betweenx([0,1], x[n], x[n+1], color=h.alt_colorblind_list[phase_arr[n]], alpha=0.1)
@@ -961,18 +1036,22 @@ def plot_wall(A, pot, gr,
             if phase_arr[n] >= 0:
                 ax[2].add_patch(plt.Polygon([(x[n],0),(x[n+1],0),(x[n+1],1),(x[n],1)], 
                                             facecolor=phase_color_list[phase_arr[n]],
-                                            alpha=0.2))
+                                            alpha=0.2*alpha))
     
     ax[2].set_xlim(xmin, xmax)
-    # ax[1].legend(loc='center right')
-    ax[1].legend(bbox_to_anchor=(1.025, 0.05, 0.25, 1.0), fontsize='x-small')
-    ax[1].grid()
+
+    if legend:    
+        ax[1].legend(bbox_to_anchor=(1.025, 0.05, 0.25, 1.0), fontsize='x-small')
+    ax[1].grid(True)
     ax[1].set_ylabel(r'$A \sqrt{3}/\Delta_B(T,p)$')
     ax[2].set_xlabel(r'$x/\xi_{\rm GL}(T)$')
 
     ax[2].grid(True)
-    ax[2].legend(bbox_to_anchor=(1.025, 0.05, 0.25, 1.0), fontsize='x-small')
-    
+    if legend:    
+        ax[2].legend(bbox_to_anchor=(1.025, 0.05, 0.25, 1.0), fontsize='x-small')
+    else:
+        ax[2].legend([],[])
+        
     ax[2].set_ylim(0,1.1)
     
     title_str = title_string.format(t, t*h.Tc_mK(p), p, H, xiGL, sigma) 
@@ -987,8 +1066,34 @@ def plot_wall(A, pot, gr,
     
     ax[0].set_title(title_str, fontsize=10)
 
-    
     plt.tight_layout()
 
     return ax
 
+def wall_width(A, pot, gr, threshold_frac=0.5, relative_to='max'):
+    
+    gap = h.norm(A)
+    t = pot.mat_pars.t
+    p = pot.mat_pars.p
+    x = gr.x
+    
+    if relative_to == 'min':
+        gap0 = np.min(gap)
+    elif relative_to == 'max':
+        gap0 = np.max(gap)
+    elif isinstance(relative_to, str):
+        gap0 = h.delta_phase_norm(t, p, relative_to)
+    else:
+        gap0 = relative_to
+    
+    dgap = np.abs(gap - gap0)
+    dgap_max = np.max(dgap)
+    
+    
+    x_near_max = dgap > dgap_max * threshold_frac
+    width1 = np.max(x[x_near_max]) - np.min(x[x_near_max])
+
+    x_max_ind = np.abs(dgap - dgap_max).argmin()
+    width2 = np.trapz((x - x[x_max_ind])**2 * dgap**2, x)/np.trapz(dgap**2, x)
+    
+    return width1, width2

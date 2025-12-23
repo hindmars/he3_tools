@@ -17,7 +17,7 @@ h.set_default("DEFAULT_T_SCALE", "Greywall")
 
 #%%
 savefig=False
-pickle = False
+pickle = True
 
 #%% Set pressure and rduced temperature
 
@@ -29,11 +29,11 @@ t = h.tAB(p)
 #%% Lattice size: grid points and physical llength
 
 # N, L_xi = (500, 25)
-N, L_xi0 = (128, 64)
+N, L_xi0 = (512, 32)
 
 #%% Get wall solution
 
-Apg_kry, sigma_bw, sigma_tot = hw.get_wall(t, p, L_xi0 * h.xi(0,p), N=N, right_phase='B')
+Apg_kry, sigma_bw, sigma_tot = hw.get_wall(t, p, L_xi0 * h.xi(0,p), N=N, right_phase='B', f_tol=1e-6)
 
 # Apg_kry is a tuple
 # Apg_kry[0] is order parameter array, Apg_kry[0].shape = (N, 3, 3), complex
@@ -50,11 +50,19 @@ title_str += rf' $dx = {dx:.1f}\xi_{{\rm GL}}^0$'
 ax2[0].set_title(title_str, fontsize='small')
 ax2[2].set_xlabel(r'$x/\xi_{{\rm GL}}^0$')
 
+pot = Apg_kry[1]
+
+sigma_AB = hw.surface_energy(*Apg_kry, zero_point='A')/abs(pot.mat_pars.f_B_norm() * (h.xi(t,p)/h.xi(0,p)))
+w_AB, w_AB = hw.wall_width(*Apg_kry)
+
+print(rf'NK: Surface energy: {sigma_AB:}, width: {w_AB:} xiGL0')
+
 #%% Plot R1
 
 x = Apg_kry[2].x
 R_vec = h.R_terms(Apg_kry[0])
 xiGL0 = h.xi(0,p)
+# xiGL = h.xi(t,p)
 
 ax2[2].plot((x - np.max(x)/2)/xiGL0, 4*R_vec[0]*(1 - R_vec[0]), '--', label=r'$4R_1(1-R_1)$')
 ax2[2].legend(fontsize='small', bbox_to_anchor=(0.9, 0.5))
