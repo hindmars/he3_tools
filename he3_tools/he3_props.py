@@ -14,7 +14,8 @@ import numpy.polynomial as nppoly
 import he3_tools.he3_bases as h3b
 import he3_tools.he3_constants as h3c
 import he3_tools.he3_data as h3d
-# import he3_matrix as h3m
+import he3_tools.he3_specific_heat as h3sh
+import he3_tools.he3_thermal_conductivity as h3tc
 
 SET_T_SCALE= {"Greywall", "PLTS"}
 DEFAULT_T_SCALE="Greywall" 
@@ -44,7 +45,7 @@ DEFAULT_ALPHA_TYPE = "GL"
 def squeeze_float(x):
     x = np.squeeze(x)
     try:
-        x = float(x)
+        x = np.float64(x)
     except:
         pass
     return x
@@ -137,12 +138,12 @@ def Tc_K(p):
     """
     return Tc_mK_expt(p)*1e-3
 
-def T_mK(t_in, p_in):
+def T_mK(t, p):
     """Converts reduced temperature ($T/T_c$) to temperature in mK.
     """
-    t = np.atleast_1d(t_in)
-    p = np.atleast_1d(p_in)
-    Tc_mK_arr = np.outer(t, Tc_mK_expt(p))
+    t_a = np.atleast_1d(t)
+    p_a = np.atleast_1d(p)
+    Tc_mK_arr = np.outer(t_a, Tc_mK_expt(p_a))
     
     return squeeze_float(Tc_mK_arr)
 
@@ -283,16 +284,17 @@ def F0a(p):
     """Landau parameter $F_0^a$."""
     return h3d.F0a_poly(p)
 
-def xi(t_in, p_in, squeeze_me=True, diagonal=False):
+def xi(t, p, squeeze_me=True, diagonal=False):
     """Ginzburg Landau correlation length at pressure p bar (nm).
     """
-    t = np.atleast_1d(t_in)
-    p = np.atleast_1d(p_in)
+    t_a = np.float64(np.atleast_1d(t))
+    p_a = np.float64(np.atleast_1d(p))
     
+    print(type(t_a), type(alpha_norm(t_a)))
     if diagonal:
-        x = 1/(-alpha_norm(t))**0.5 * h3c.xiGL_const*xi0(p)
+        x = 1/(-alpha_norm(t_a))**0.5 * h3c.xiGL_const*xi0(p_a)
     else:
-        x = np.outer(1/(-alpha_norm(t))**0.5, h3c.xiGL_const*xi0(p))
+        x = np.outer(1/(-alpha_norm(t_a))**0.5, h3c.xiGL_const*xi0(p_a))
 
     if squeeze_me:
         x = squeeze_float(x)
@@ -300,20 +302,19 @@ def xi(t_in, p_in, squeeze_me=True, diagonal=False):
     # return h3c.xiGL_const*xi0(p)/(-alpha_norm(t))**0.5
     return x
 
-def xi_delta(t_in, p_in, squeeze_me=True, diagonal=False):
+def xi_delta(t, p, squeeze_me=True, diagonal=False):
     """BCS correlation length at pressure p bar (nm).
     """
-    t = np.atleast_1d(t_in)
-    p = np.atleast_1d(p_in)
+    t_a = np.atleast_1d(t)
+    p_a = np.atleast_1d(p)
     
     if diagonal:
-        x = 1/(-alpha_bcs(t))**0.5 * h3c.xiGL_const*xi0(p)
+        x = 1/(-alpha_bcs(t_a))**0.5 * h3c.xiGL_const*xi0(p_a)
     else:
-        x = np.outer(1/(-alpha_bcs(t))**0.5, h3c.xiGL_const*xi0(p))
+        x = np.outer(1/(-alpha_bcs(t_a))**0.5, h3c.xiGL_const*xi0(p_a))
 
     if squeeze_me:
         x = squeeze_float(x)
-
 
     return x
     
@@ -384,7 +385,10 @@ def tauN0(t, p):
 def tau_qp(t, p):
     """
     Mean free scattering time of quasiparticles (a.k.a. quasiparticle lifetime).
-    Uses Greywall 1984 data, and enforces Greywall temparature.
+    Uses Greywall 1984 data for near-zero temperature behaviour, as gvein in 
+    Table V of Greywall, Phys Rev B29, 4933 (1984).
+    
+    Enforces Greywall temparature scale.
 
     Units: s
     
@@ -403,12 +407,12 @@ def tau_qp(t, p):
         Quasiparticle lifetime in seconds.
 
     """
-    p_data = h3d.data_Gre86_therm_cond[:,0]
-    tauT2_data = h3d.data_Gre86_therm_cond[:,5]
+    p_data = h3d.data_Gre84_therm_cond[:,0]
+    tauT2_data = h3d.data_Gre84_therm_cond[:,5]
     
     # Greywall is in sec/K^2, same as musec/mK^2
     tauT2_interp = np.interp(p, p_data, tauT2_data)
-    print(p, tauT2_interp)
+    # print(p, tauT2_interp)
     
     if get_setting('DEFAULT_T_SCALE') != 'Greywall':
         tmp_set = get_setting('DEFAULT_T_SCALE')
@@ -417,9 +421,58 @@ def tau_qp(t, p):
         set_default('DEFAULT_T_SCALE', tmp_set)
     else:
         T = T_mK(t, p)
-    print(p, tauT2_interp, T)
+    # print(p, tauT2_interp, T)
     
     return 1/T**2 * tauT2_interp  * 1e-6
+
+def tau_from_CV_over_kappa(t, p):
+    """
+    Mean free scattering time of quasiparticles (a.k.a. quasiparticle lifetime).
+    Uses Greywall fitting functions for heat capacity and thermal conductivity, 
+    and the konetic theory expression
+    $$
+    \kappa = \frac{1}{3} v_F^2 C_V \tau_{qp},
+    $$
+    where $\kappa$ is thermal conductivity, $v_F$ is Fermi speed, $C_V$ is 
+    volumentric heat capacity. 
+
+    Enforces the Greywall temparature scale.
+
+    Units: s
+    
+    Parameters
+    ----------
+    t : float, np.ndarray
+        Reduced temperature.
+    p : float, np.ndarray
+        Pressure in bar.
+    
+    Returns
+    -------
+    float, nd.array
+        Quasiparticle lifetime in seconds.
+
+    """
+    
+    t_a = np.atleast_1d(t)
+    p_a = np.atleast_1d(p)
+
+    if get_setting('DEFAULT_T_SCALE') != 'Greywall':
+        tmp_set = get_setting('DEFAULT_T_SCALE')
+        set_default('DEFAULT_T_SCALE', 'Greywall')
+        T_a = T_mK(t_a, p_a)*1e-3
+        set_default('DEFAULT_T_SCALE', tmp_set)
+    else:
+        T_a = T_mK(t_a, p_a)*1e-3
+    # print(p, tauT2_interp, T)
+    
+    vf2 = vf(p_a)**2 # m/a
+    cv = h3sh.C_V_normal(t_a, p_a) # 
+    k = h3tc.thermal_conductivity_normal_liquid(T_a, p_a)
+    
+    tau = k / ( (vf2/3) * cv)
+    
+    return squeeze_float(tau) * 1e-9
 
 def mfp0(t, p):
     """
@@ -508,7 +561,7 @@ def gz(p):
     bn24 = bn[1] + bn[3]
     return (-bn5/bn24)*h3c.lambda_A1/Tc_mK(p)
 
-def H_scale(t_in, p_in):
+def H_scale(t, p):
     r"""
     Magnetic field scale implied by material parameters $\alpha$ and $g_H$, 
     through $H_s^2 \equiv \sqrt{-\alpha/g_H}$).
@@ -526,10 +579,10 @@ def H_scale(t_in, p_in):
         Magnetic field in tesla.
 
     """
-    t = np.atleast_1d(t_in)
-    p = np.atleast_1d(p_in)
+    t_a = np.atleast_1d(t)
+    p_a = np.atleast_1d(p)
 
-    h_s = np.sqrt(np.outer(-alpha_norm(t),1/gH(p)))
+    h_s = np.sqrt(np.outer(-alpha_norm(t_a),1/gH(p_a)))
     
     h_s = np.squeeze(h_s)
 
@@ -620,14 +673,14 @@ def alpha_bcs(t):
     """
     return (t**h3c.a_bcs - 1 )/h3c.a_bcs
 
-def alpha_norm(t_in, squeeze_me=True):
+def alpha_norm(t, squeeze_me=True):
     """Quadratic material parameter
     """
-    t = np.atleast_1d(t_in)
+    t_a = np.float64(np.atleast_1d(t))
     if DEFAULT_ALPHA_TYPE == "GL":
-        a = t - 1
+        a = t_a - np.float64(1.0)
     elif DEFAULT_ALPHA_TYPE == "BCS":
-        a =  alpha_bcs(t)
+        a =  alpha_bcs(t_a)
     else:
         raise ValueError("DEFAULT_ALPHA_TYPE must be GL or BCS")
 
@@ -649,13 +702,13 @@ def beta_wc_norm_asarray():
     beta_wc_norm_list = [ beta_wc_norm(n) for n in range(1,6)]
     return np.array(beta_wc_norm_list)
 
-def delta_beta_norm(t_in, p_in, n):
+def delta_beta_norm(t, p, n):
     """Strong coupling correction to material parameter beta(n), 
     with units of f_scale/(2 * np.pi * kB * Tc)**2
     """ 
-    t = np.atleast_1d(t_in)
-    p = np.atleast_1d(p_in)
-    t_db = np.outer(t, delta_b(p, n))
+    t_a = np.atleast_1d(t)
+    p_a = np.atleast_1d(p)
+    t_db = np.outer(t_a, delta_b(p_a, n))
 
     return squeeze_float(t_db)
 
@@ -663,19 +716,19 @@ def delta_beta_norm_asarray(t, p):
     delta_beta_norm_list = [ delta_beta_norm(t, p, n) for n in range(1,6)]
     return np.array(delta_beta_norm_list)
 
-def beta_norm(t_in, p_in, n, squeeze_me=True, diagonal=False):
+def beta_norm(t, p, n, squeeze_me=True, diagonal=False):
     """Complete material parameter including strong coupling correction, within units of 
     f_scale/(2 * np.pi * kB * Tc)**2
     """ 
     b = b_wc(n)
     
-    t = np.atleast_1d(t_in)
-    p = np.atleast_1d(p_in)
+    t_a = np.atleast_1d(t)
+    p_a = np.atleast_1d(p)
     
     if diagonal:
-        t_db = t * delta_b(p, n)
+        t_db = t_a * delta_b(p_a, n)
     else:
-        t_db = np.outer(t, delta_b(p, n))
+        t_db = np.outer(t_a, delta_b(p_a, n))
 
     be = h3c.beta_const*(b + t_db)
     
@@ -702,16 +755,16 @@ def beta_phase_norm(t, p, phase, squeeze_me=True, diagonal=False):
     # print('t', t, 'p', p)
     return np.sum( (beta_norm_asarray(t, p, squeeze_me, diagonal).T * h3b.R_dict[phase]).T, axis=0) 
 
-def f_phase_norm(t_in, p_in, phase, squeeze_me=True, diagonal=False):
+def f_phase_norm(t, p, phase, squeeze_me=True, diagonal=False):
     """Normalised free energy in a given phase.
     """
-    t = np.atleast_1d(t_in)
-    p = np.atleast_1d(p_in)
+    t_a = np.atleast_1d(t)
+    p_a = np.atleast_1d(p)
 
     if diagonal:
-        f = -0.25* alpha_norm(t)**2 /( beta_phase_norm(t, p, phase, squeeze_me=False, diagonal=True))
+        f = -0.25* alpha_norm(t_a)**2 /( beta_phase_norm(t_a, p_a, phase, squeeze_me=False, diagonal=True))
     else:
-        f = -0.25* alpha_norm(t[:,None])**2 /( beta_phase_norm(t, p, phase, squeeze_me=False))
+        f = -0.25* alpha_norm(t_a[:,None])**2 /( beta_phase_norm(t_a, p_a, phase, squeeze_me=False))
         
     f[f > 0] = 0.0
     
@@ -720,16 +773,16 @@ def f_phase_norm(t_in, p_in, phase, squeeze_me=True, diagonal=False):
         
     return f
 
-def delta_phase_norm(t_in, p_in, phase, squeeze_me=True, diagonal=False):
+def delta_phase_norm(t, p, phase, squeeze_me=True, diagonal=False):
     """Normalised gap parameter in a given phase.
     """
-    t = np.atleast_1d(t_in)
-    p = np.atleast_1d(p_in)
+    t_a = np.atleast_1d(t)
+    p_a = np.atleast_1d(p)
     
     if diagonal:
-        d2 = - alpha_norm(t)/(2 * beta_phase_norm(t, p, phase, squeeze_me=False, diagonal=True))
+        d2 = - alpha_norm(t_a)/(2 * beta_phase_norm(t_a, p_a, phase, squeeze_me=False, diagonal=True))
     else:
-        d2 = - alpha_norm(t[:, None])/(2 * beta_phase_norm(t, p, phase, squeeze_me=False))
+        d2 = - alpha_norm(t_a[:, None])/(2 * beta_phase_norm(t_a, p_a, phase, squeeze_me=False))
 
     d2[d2 < 0.0] = 0.0
     d = np.sqrt(d2)
@@ -737,10 +790,10 @@ def delta_phase_norm(t_in, p_in, phase, squeeze_me=True, diagonal=False):
         d = squeeze_float(d)
     return d
 
-def delta_wc(t_in):
-    t = np.atleast_1d(t_in)
-    t[t>1.0] = 1.0
-    return np.sqrt(- alpha_norm(t)/(2 * h3c.beta_const))
+def delta_wc(t):
+    t_a = np.atleast_1d(t)
+    t_a[t_a>1.0] = 1.0
+    return np.sqrt(- alpha_norm(t_a)/(2 * h3c.beta_const))
 
 def beta_A_norm(t, p):    
     """Normalised effective single beta parameter for A phase.
@@ -840,242 +893,6 @@ def TAB_mK(p):
     """
     return tAB(p) * Tc_mK_expt(p)
 
-# specific heats
-
-# def C_V_normal(t, p):
-#     """
-#     Normal phase specific heat in units J / K / nm$^3$, with strong coupling 
-#     corrections included.  Uses formula (2.13) from Vollhardt & Woelfle.
-#     $$
-#     C_V = \frac{\pi^2}{3} N_F k_B^2 T
-#     $$
-
-#     Parameters
-#     ----------
-#     t : float, int, numpy.ndarray
-#         Reduced temperature, $T/T_c$.
-#     p : float, int, numpy.ndarray
-#         Pressure in bar.
-
-#     Only one or other of t and p can be an array.
-
-#     Returns
-#     -------
-#     float or numpy.ndarray
-#         Normal phase specific heat at temperature $t$ and pressure p.
-
-#     """
-    
-#     return (np.pi**2/3) * h.N0(p) * h.kB**2 *( h.Tc_mK(p)/1000) * t    
-
-# def C_V_normal(t, p, squeeze_me=True, diagonal=False):
-#     """
-#     Normal phase specific heat in units J / K / nm$^3$, with strong coupling 
-#     corrections included.  Uses formula (2.13) from Vollhardt & Woelfle.
-#     $$
-#     C_V = \frac{\pi^2}{3} N_F k_B^2 T
-#     $$
-#     where $N_F$ is the total density of states, including the spin sum.
-
-#     Parameters
-#     ----------
-#     t : float, int, numpy.ndarray (1D)
-#         Reduced temperature, $T/T_c$.
-#     p : float, int, numpy.ndarray (1D)
-#         Pressure in bar.
-
-
-#     Returns
-#     -------
-#     float or numpy.ndarray
-#         Normal phase specific heat at temperature $t$ and pressure $p$. 
-#         If both t and p are 1D arrays of length greater than 1, the return 
-#         value has shape (len(t), len(p))
-
-#     """
-    
-#     # Remember that N0 is the single-spin density of states
-#     c_scale =  np.pi**2 * (2*N0(p)) * h3c.kB**2 *(Tc_mK(p)/1000) / 3 
-#     t = np.atleast_1d(t)
-#     p = np.atleast_1d(p)
-#     # c_v =np.outer(t, np.pi**2 * f_scale(p) / (Tc_mK(p)/1000))
-#     if diagonal:
-#         c_v = t * c_scale
-#     else:
-#         c_v = np.outer(t, c_scale)    
-            
-#     if squeeze_me:
-#         c_v = np.squeeze(c_v)
-
-#     try:
-#         c_v = float(c_v)
-#     except:
-#         pass
-
-#     # return  np.pi**2 * f_scale(p) / (Tc_mK(p)/1000) * t
-#     return c_v
-
-# def delta_C_V_Tc(p, phase):
-#     """
-#     Jump in specific heat at superfluid phase transition in units J / K / nm$^3$, 
-#     with strong coupling corrections included.  Uses formula (3.78) from 
-#     Vollhardt & Woelfle.
-#     $$
-#     \Delta C_V = \frac{1} N(0) \frac{\partial}{\partial T} \langle \Delta_{\bf k}^\dagger \Delta_{\bf k} \rangle_{\hat{\bf k}}
-#     $$
-
-#     Parameters
-#     ----------
-#     p : float, int, numpy.ndarray
-#         Pressure in bar.
-#     phase : str
-#         Phase string, e.g. "A", "B".
-        
-
-#     Returns
-#     -------
-#     float or numpy.ndarray
-#         Specific heat jump at pressure p.
-
-#     """
-#     return  0.25 * f_scale(p) / (Tc_mK(p)/1000 * beta_phase_norm(1, p, phase))
-
-# def C_V(t, p, phase):
-#     """
-#     Specific heat in given phase, with strong coupling 
-#     corrections included.  Uses formula (3.77) from Vollhardt & Woelfle.
-#     $$
-#     C_V = C_N + \Delta C_V
-#     $$
-#     Below $T_c$ (i.e. for t < 1) it uses the emperical observation that the 
-#     specific heat deecreases apprximately as $t^3$.
-
-#     Units:  units J / K / nm$^3$
-
-#     Parameters
-#     ----------
-#     t : float, int, numpy.ndarray
-#         Reduced temperature, $T/T_c$.
-#     p : float, int, numpy.ndarray
-#         Pressure in bar.
-
-#     If both t and p are arrays, then C_V is 2D array.
-
-#     Returns
-#     -------
-#     float or numpy.ndarray
-#         Specific heat at temperature $t$ and pressure p.
-
-#     """
-#     t = np.atleast_1d(t)
-#     p = np.atleast_1d(p)
-    
-#     c_v = np.outer(t**3, C_V_normal(1,p) + delta_C_V_Tc(p, phase) )
-        
-#     c_v[t>1,:] = C_V_normal(t[t>1], p, squeeze_me=False)
-
-#     # c_v = np.squeeze(c_v)
-    
-#     # try:
-#     #     c_v = float(c_v)
-#     # except:
-#     #     pass
-    
-#     return squeeze_float(c_v)
-
-# def kappa_0(t, p):
-#     """
-#     Gas-kinetic expression for thermal conductivity, V&W eqn 2.40.  
-    
-#     Units: J / ns / nm / K
-
-#     Parameters
-#     ----------
-#     t : float, int, numpy.ndarray
-#         Reduced temperature, $T/T_c$.
-#     p : float, int, numpy.ndarray
-#         Pressure in bar.
-
-#     Only one or other of t and p can be an array.
-
-#     Returns
-#     -------
-#     float or numpy.ndarray
-#         Gas-kinetic thermal conductivity at temperature $t$ and pressure p.
-
-#     """
-#     # C_V is in J / K / nm^3, vf is in m/s (also nm/ns), tau_qp is in seconds
-#     t = np.atleast_1d(t)
-#     p = np.atleast_1d(p)
-
-#     vf2 = (vf(p))**2 
-#     k0 = (1e9/3) * C_V_normal(t, p) * tau_qp(t, p) * vf2[None, :]
-
-#     k0 = np.squeeze(k0)
-
-#     try:
-#         k0 = float(k0)
-#     except:
-#         pass
-#     # return (1/3) * C_V_normal(t, p) * (vf(p))**2 * tau_qp(t, p) * 1e9
-#     return k0
-
-
-# def kappa(t, p):
-#     """
-#     Experimental low temperature thermal conductivity, Greywall 1984  
-    
-#     Units:    J / ns / nm / K
-
-#     Parameters
-#     ----------
-#     t : float, int, numpy.ndarray
-#         Reduced temperature, $T/T_c$.
-#     p : float, int, numpy.ndarray
-#         Pressure in bar.
-
-#     Only one or other of t and p can be an array.
-
-#     Returns
-#     -------
-#     float or numpy.ndarray
-#         Extrapolated measured thermal conductivity at temperature $t$ and pressure p.
-
-#     """
-#     t = np.atleast_1d(t)
-#     p = np.atleast_1d(p)
-
-#     p_data = h3d.data_Gre84_therm_cond[:, 0]
-#     kappaT_data = h3d.data_Gre84_therm_cond[:, 4]
-#     b_data = h3d.data_Gre84_therm_cond[:, 6]
-    
-    
-#     kappaT0_interp = np.interp(p, p_data, kappaT_data) 
-#     a = 1/kappaT0_interp
-#     b = np.interp(p, p_data, b_data) 
-
-#     if get_setting('DEFAULT_T_SCALE') != 'Greywall':
-#         tmp_set = get_setting('DEFAULT_T_SCALE')
-#         set_default('DEFAULT_T_SCALE', 'Greywall')
-#         T = T_mK(t, p)*1e-3
-#         set_default('DEFAULT_T_SCALE', tmp_set)
-#     else:
-#         T = T_mK(t, p)*1e-3
-
-#     kappaT_interp = 1/(a + b*T)
-
-#     k = kappaT_interp[None, :] / T
-
-#     k = np.squeeze(k)
-    
-#     try:
-#         k = float(k)
-#     except:
-#         pass
-#     # print(p, T, kappaT_interp)
-
-#     # Greywall is in erg/sec/cm, convert to J/ns/nm 
-#     return k * 1e-7/(1e9 * 1e9 * 1e-2)
 
 def gamma_c(p):
     """
@@ -1119,7 +936,7 @@ def thermal_diffusivity(t, p):
         Thermal diffusivity.
 
     """
-    return kappa(t, p)/C_V_normal(t, p)
+    return h3tc.kappa(t, p)/h3sh.C_V_normal(t, p)
 
 def thermal_diffusivity_norm(t, p):
     r"""

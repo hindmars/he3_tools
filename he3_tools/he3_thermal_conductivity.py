@@ -58,62 +58,33 @@ def kappa_0(t, p):
     return k0
 
 
-def kappa(t, p):
+def thermal_conductivity_vlow(V, T):
     """
-    Experimental low temperature thermal conductivity, Greywall 1984  
+    Experimental very low temperature thermal conductivity, Greywall Phys. Rev. B29, 
+    4933 (1984). Interpolated from Table V.
     
-    Units:    J / ns / nm / K
-
-    Parameters
-    ----------
-    t : float, int, numpy.ndarray
-        Reduced temperature, $T/T_c$.
-    p : float, int, numpy.ndarray
-        Pressure in bar.
-
-    Only one or other of t and p can be an array.
-
-    Returns
-    -------
-    float or numpy.ndarray
-        Extrapolated measured thermal conductivity at temperature $t$ and pressure p.
-
+    Inputs:
+        V (float): molar volume (e.g., cm^3/mol)
+        T (float): temperature (K)
+    Returns:
+        kappa (float): thermal conductivity in erg/sec cm K
     """
-    t = np.atleast_1d(t)
-    p = np.atleast_1d(p)
 
-    p_data = h3d.data_Gre84_therm_cond[:, 0]
+    # p_data = h3d.data_Gre84_therm_cond[:, 0]
+    V_data = h3d.data_Gre84_therm_cond[:, 1]
     kappaT_data = h3d.data_Gre84_therm_cond[:, 4]
     b_data = h3d.data_Gre84_therm_cond[:, 6]
     
-    
-    kappaT0_interp = np.interp(p, p_data, kappaT_data) 
+    kappaT0_interp = np.interp(V, V_data, kappaT_data) 
     a = 1/kappaT0_interp
-    b = np.interp(p, p_data, b_data) 
-
-    if h3p.get_setting('DEFAULT_T_SCALE') != 'Greywall':
-        tmp_set = h3p.get_setting('DEFAULT_T_SCALE')
-        h3p.set_default('DEFAULT_T_SCALE', 'Greywall')
-        T = h3p.Tc_K(p)*t
-        h3p.set_default('DEFAULT_T_SCALE', tmp_set)
-    else:
-        T = h3p.Tc_K(p)*t
-
+    b = np.interp(V, V_data, b_data) 
+    
     kappaT_interp = 1/(a + b*T)
 
     k = kappaT_interp[None, :] / T
-
-    k = np.squeeze(k)
+    k = h3p.squeeze_float(k)
     
-    try:
-        k = float(k)
-    except:
-        pass
-    # print(p, T, kappaT_interp)
-
-    # Greywall is in erg/sec/cm, convert to J/ns/nm 
-    return k * 1e-7/(1e9 * 1e9 * 1e-2)
-
+    return k
 
 # ===============================
 # Coefficients from Table III
@@ -225,7 +196,8 @@ def thermal_conductivity_normal_liquid(T, p, units='default', T_K_lowest= 0.007)
     kappa_arr = np.zeros_like(T)
     V = h3p.molar_vol_cm3(p)
     if np.any(vlow_T):
-        kappa_arr[vlow_T] = kappa(T[vlow_T]/h3p.Tc_K(p), p)*1e18 / conv_erg_sec_cm_K_SI
+        # kappa_arr[vlow_T] = kappa(T[vlow_T]/h3p.Tc_K(p), p)*1e18 / conv_erg_sec_cm_K_SI
+        kappa_arr[vlow_T] = thermal_conductivity_vlow(V, T[vlow_T])
     if np.any(low_T):
         kappa_arr[low_T] = thermal_conductivity_low(V, T[low_T])  
     if np.any(high_T):
@@ -241,3 +213,41 @@ def thermal_conductivity_normal_liquid(T, p, units='default', T_K_lowest= 0.007)
         factor = conv_erg_sec_cm_K_SI * 1e-18
         
     return kappa_arr*factor
+
+def kappa(t, p, units='default', T_K_lowest= 0.007):
+    """
+    Experimental thermal conductivity data, Greywall Phys. Rev. B29, 
+    4933 (1984). Enforces Greywall temperature scale.
+    
+    Parameters
+    ----------
+    t : float, int, numpy.ndarray
+        Reduced temperature, $T/T_c$.
+    p : float, int, numpy.ndarray
+        Pressure in bar.
+    units:
+        default: J / ns nm K
+        SI: J / s m K
+        cgs: erg/sec cm K
+        dimless: J / K in k_B, length unit xlGL(0), time unit xiGL(0)/vF
+    T_K_lowest: (K) switch to theoretical below this temp, default 7 mK
+
+    Returns
+    -------
+    float or numpy.ndarray
+        Extrapolated measured thermal conductivity at reduced temperature $t$ 
+        and pressure p.
+
+    """
+    t = np.atleast_1d(t)
+    p = np.atleast_1d(p)
+
+    if h3p.get_setting('DEFAULT_T_SCALE') != 'Greywall':
+        tmp_set = h3p.get_setting('DEFAULT_T_SCALE')
+        h3p.set_default('DEFAULT_T_SCALE', 'Greywall')
+        T = h3p.Tc_K(p)*t
+        h3p.set_default('DEFAULT_T_SCALE', tmp_set)
+    else:
+        T = h3p.Tc_K(p)*t
+    
+    return thermal_conductivity_normal_liquid(T, p, units, T_K_lowest)

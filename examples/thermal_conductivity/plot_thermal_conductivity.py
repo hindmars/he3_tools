@@ -33,7 +33,8 @@ def p_from_molar_vol_cm3(V_in):
 
 p_arr = p_from_molar_vol_cm3(V_arr)
 
-print('Pressure equivalents', p_arr)
+for V, p in zip(V_arr, p_arr):
+    print(f'Molar volume (cm^3) = {V:5.2f}, pressure equivalent (bar) = {p:5.2f}')
 
 #%%
 
