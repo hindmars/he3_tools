@@ -249,6 +249,14 @@ def molar_vol_cm3(p):
     """
     return (1e-7)**3 * h3c.N_A / npart(p)
 
+def p_bar_from_molar_vol_cm3(V):
+    """Pressure p bar at molar volume ($cm^{3}$). Interpolation. 
+    """
+    V_nm3 = V*1e7**3 # molar volume in nm^3
+    npart = h3c.N_A/V_nm3
+    # print(npart)
+    return np.interp(npart, h3d.np_data, h3d.p_nodes)
+
 def mstar_m(p):
     """Effective mass ratio at pressure p bar.
     """

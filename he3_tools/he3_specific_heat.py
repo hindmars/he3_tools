@@ -14,9 +14,45 @@ import he3_tools.he3_props as h3p
 
 # he3.set_default("DEFAULT_T_SCALE", 'Greywall')
 
+def gamma(p):
+    """
+    Utility for very low temperature molar heat capacity, $C_V/RT = \gamma(P)$.
+    
+    Computes the value of gamma(P) based on equation (17) of Greywall 1986
+    
+        γ(P) = a0 + a1*P + a2*P^2 + a3*P^3 + a4*P^4
+    
+    Parameters
+    ----------
+    p : float, int, numpy.ndarray
+        Pressure in bar.
+
+    Returns
+    -------
+    float or numpy.ndarray
+        Value of gamma.
+
+    """
+    # Coefficients from the image
+    # a0 = 0.27840464 * 10**1
+    # a1 = 0.69575243 * 10**-1
+    # a2 = -0.14738303 * 10**-2
+    # a3 = 0.46153498 * 10**-4
+    # a4 = -0.53785385 * 10**-6
+    a0 = 0.27840464e1
+    a1 = 0.69575243e-1
+    a2 = -0.14738303e-2
+    a3 = 0.46153498e-4
+    a4 = -0.53785385e-6
+
+    # Polynomial evaluation
+    return a0 + a1*p + a2*p**2 + a3*p**3 + a4*p**4
+
+
+
 def C_V_normal(t, p, squeeze_me=True, diagonal=False):
     """
-    Normal phase specific heat in units J / K / nm$^3$, with strong coupling 
+    Normal phase volumetric heat capacity in units J / K / nm$^3$, with strong coupling 
     corrections included.  Uses formula (2.13) from Vollhardt & Woelfle.
     $$
     C_V = \frac{\pi^2}{3} N_F k_B^2 T
@@ -88,13 +124,13 @@ def delta_C_V_Tc(p, phase):
 
 def C_V(t, p, phase):
     """
-    Specific heat in given phase, with strong coupling 
+    Volumetric heat capacity in given phase, including normal phases, with strong coupling 
     corrections included.  Uses formula (3.77) from Vollhardt & Woelfle.
     $$
     C_V = C_N + \Delta C_V
     $$
-    Below $T_c$ (i.e. for t < 1) it uses the emperical observation that the 
-    specific heat deecreases apprximately as $t^3$.
+    Below $T_c$ (i.e. for t < 1) it uses the emperical observation (Greywall 
+    1986)that the heat capacity deecreases apprximately as $t^3$.
 
     Units:  units J / K / nm$^3$
 
@@ -110,7 +146,7 @@ def C_V(t, p, phase):
     Returns
     -------
     float or numpy.ndarray
-        Specific heat at temperature $t$ and pressure p.
+        Volumetric heat capacity at temperature $t$ and pressure p.
 
     """
     t = np.atleast_1d(t)
@@ -162,8 +198,22 @@ d = [-7.1613436e0,  6.0525139e-1,  -7.1295855e-3]
 # ===============================
 # Implementations
 # ===============================
+def heat_capacity_vlow(V, T):
+    """
+    Eq. (7): Valid below ~7 mK
+    Inputs:
+        V (float): molar volume (e.g., cm^3/mol)
+        T (float): temperature (K, Greywall scale)
+    Returns:
+        Cv (float): specific heat in the same units used by the fit (per mole)
+    """
+    p = h3p.p_bar_from_molar_vol_cm3(V)
+    # Cv = gamma(p) * (h3c.R * T)
+    print(p, gamma(p))
+    Cv = gamma(p) * T
+    return Cv
 
-def specific_heat_low(V, T):
+def heat_capacity_low(V, T):
     """
     Eq. (7): Valid below ~0.1 K
     Inputs:
@@ -182,7 +232,7 @@ def specific_heat_low(V, T):
             Vpow /= V
     return Cv
 
-def specific_heat_high(V, T):
+def heat_capacity_high(V, T):
     """
     Eq. (8): Valid at/above ~0.1 K
     Inputs:
@@ -229,7 +279,7 @@ def specific_heat_high(V, T):
 # Combined convenience function
 # ===============================
 
-def specific_heat_Greywall(V, T):
+def heat_capacity_Greywall(V, T):
     """
     Selects Eq. (7) for T < 0.1 K and Eq. (8) for T >= 0.1 K.
     Inputs:
@@ -241,18 +291,21 @@ def specific_heat_Greywall(V, T):
     T = np.atleast_1d(T)
     low_T = T < 0.1
     Cv = np.zeros_like(T)
-    Cv[low_T] = specific_heat_low(V, T[low_T])  
-    Cv[~low_T] = specific_heat_high(V, T[~low_T])
+    Cv[low_T] = heat_capacity_low(V, T[low_T])  
+    Cv[~low_T] = heat_capacity_high(V, T[~low_T])
     return Cv
 
-def specific_heat_normal_liquid(T, p, units='default', T_K_lowest=0.007):
+def heat_capacity_normal_liquid(T, p, units='default', T_K_lowest=0.007):
     r"""
-    Specific Heat from Greywall 1983. 
-    Selects Eq. (7) for T < 0.1 K and Eq. (8) for T >= 0.1 K.
+    Heat caoacity from Greywall Phys Rev B27, 2747 (1983) & B29, 7520 (1986)
+    For T < T_K_lowest selects C_V/RT from 1986 paper.
+    For T > T_K_lowest, uses 1983 paper, Eq. (7) for T < 0.1 K and Eq. (8) for 
+    T >= 0.1 K.
+    
     Inputs:
-        T (float): temperature (K)
-        p : pressure (bar)
-        units:            
+        T (float or numpy.ndarray) : temperature (K, Greywall)
+        p (float) : pressure (bar)
+        units :            
             default: J /  K nm^3
             SI: J / K m^3
             R: divided by gas constant R
@@ -260,7 +313,7 @@ def specific_heat_normal_liquid(T, p, units='default', T_K_lowest=0.007):
         T_K_lowest: (K) switch to theoretical below this temp
 
     Returns:
-        Cv (float): volumetric specific heat in chosen units
+        Cv (float): heat capacity in chosen units
 
     """
     T = np.atleast_1d(T)
@@ -269,13 +322,15 @@ def specific_heat_normal_liquid(T, p, units='default', T_K_lowest=0.007):
     high_T = 0.1 < T
     Cv = np.zeros_like(T)
     V = h3p.molar_vol_cm3(p)
+    # print('V', V)
     V_m3 = V * (1e-2)**3
     if np.any(vlow_T):
-        Cv[vlow_T] = C_V_normal(T[vlow_T]/h3p.Tc_K(p), p) * (h3c.N_A/h3p.npart(0))/h3c.R
+        # Cv[vlow_T] = C_V_normal(T[vlow_T]/h3p.Tc_K(p), p) * (h3c.N_A/h3p.npart(0))/h3c.R
+        Cv[vlow_T] = heat_capacity_vlow(V, T[vlow_T])
     if np.any(low_T):
-        Cv[low_T] = specific_heat_low(V, T[low_T])  
+        Cv[low_T] = heat_capacity_low(V, T[low_T])  
     if np.any(high_T):
-        Cv[high_T] = specific_heat_high(V, T[high_T])
+        Cv[high_T] = heat_capacity_high(V, T[high_T])
         
     if units == 'R':
         factor = 1.0
@@ -286,4 +341,4 @@ def specific_heat_normal_liquid(T, p, units='default', T_K_lowest=0.007):
     else: # he3_tools uses J / K / nm^3
         factor = h3c.R / V_m3 * (1e-9)**3
             
-    return Cv*factor
+    return h3p.squeeze_float(Cv*factor)
