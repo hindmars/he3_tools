@@ -11,22 +11,28 @@ and other important quantities.
 import os
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # Returns the absolute path to your package folder
+data_sources_dir = BASE_DIR + os.sep + 'data_sources' + os.sep
 
 import numpy as np
 import numpy.polynomial as nppoly
+import pandas as pd
 import he3_tools.he3_constants as h3c
 
+
 def convert_b_to_db(b_list, n):
+    """Convert absolute b (beta in units of weak coupling beta) to a change in 
+    b."""
     db_list = []
     for b in b_list:
         db_list.append(b - h3c.b_wc_list[n-1])
     return db_list
 
-
-# Construct dictionaries of model strong coupling corrections.
-# From Regan, Wiman, Sauls arXiv:1908.04190 Table 1
+# Data for interpolations of strong coupling corrections to beta parameters.
 
 def get_interp_data_rws19():
+    """Table of strong coupling beta parameters from Regan Wiman Sauls 2019, 
+    Table 1.
+    """
     p_nodes_beta = range(0, 36, 2)
     
     c1 = [-0.0098, -0.0127, -0.0155, -0.0181, -0.0207, -0.0231, -0.0254, -0.0275,
@@ -54,7 +60,8 @@ def get_interp_data_rws19():
     return [p_nodes_beta, c_list]
 
 def get_interp_data_wiman_thesis():
-    """From Figure 8, grabbed using Web Plot Digitiser.
+    """Table of strong coupling beta parameters from J. Wiman thesis Figure 8, 
+    grabbed using Web Plot Digitiser.
     """
     
     p_nodes = [0.0, 2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 18.0, 20.0, 
@@ -85,7 +92,9 @@ def get_interp_data_wiman_thesis():
     return [p_nodes, c_list]
 
 def get_interp_data_choi():
-    p_choi = range(0, 35, 1)
+    """Table of strong coupling beta parameters from Choi et al PRB 2007, Table II.
+    """
+    p_choi = list(range(0, 35, 1))
     b1_choi = [-0.97, -0.97, -0.97, -0.98, -0.98, -0.98, -0.98, -0.98, -0.98, -0.99, -0.99, -0.99, -0.99, -0.99,
                -1.00, -1.00, -1.00, -1.00, -1.00, -1.00, -1.01, -1.01, -1.01, -1.01, -1.01, -1.01, -1.02, -1.02,
                -1.02,  -1.02, -1.02, -1.03, -1.03, -1.03, -1.03]
@@ -115,18 +124,18 @@ def get_interp_data_choi():
 def get_interp_data_ss81():
     """ Sauls and Serene Physical Review B 24, 183 (1981), Table II."""
     p_nodes = [0, 12, 16, 20, 24, 28, 34.4]
-    c1 = [0, -0.034, -0.041, -0.048, -0.056, -0.062, -0.074]
-    c2 = [0, -0.080, -0.088, -0.095, -0.101, -0.105, -0.103]
-    c3 = [0, -0.117, -0.128, -0.136, -0.140, -0.139, -0.123]
-    c4 = [0, -0.199, -0.229, -0.254, -0.273, -0.286, -0.298]
-    c5 = [0, -0.195, -0.235, -0.277, -0.321, -0.369, -0.469]
+    c1 = [0.0, -0.034, -0.041, -0.048, -0.056, -0.062, -0.074]
+    c2 = [0.0, -0.080, -0.088, -0.095, -0.101, -0.105, -0.103]
+    c3 = [0.0, -0.117, -0.128, -0.136, -0.140, -0.139, -0.123]
+    c4 = [0.0, -0.199, -0.229, -0.254, -0.273, -0.286, -0.298]
+    c5 = [0.0, -0.195, -0.235, -0.277, -0.321, -0.369, -0.469]
     c_list = [c1, c2, c3, c4, c5]
 
     return [p_nodes, c_list]
 
 def get_poly_ws15():
-    # polynomial coefficients from J. J. Wiman ‚ J. A. Sauls prb 92, 144515 (2015)
-    # \Delta{\beta_i^{sc}}/|beta_1^{wc}| = a_n^{i} p^{n}, p in bar
+    """Polynomial coefficients from J. J. Wiman ‚ J. A. Sauls prb 92, 144515 (2015)
+    $\Delta{\beta_i^{sc}}/|beta_1^{wc}| = a_n^{i} p^{n}$, with p in bar"""
     a1sc = [3.070e-2, -2.081e-3, 2.133e-5, -4.189e-7]
     a2sc = [-1.074e-1, 5.412e-2, -1.081e-2, 1.025e-3, -5.526e-5, 1.722e-6, -2.876e-8, 1.991e-10]
     a3sc = [1.038e-1, -1.752e-1, 3.488e-2, -4.243e-3, 3.316e-4, -1.623e-5, 4.755e-7, -7.587e-9, 5.063e-11]
@@ -136,7 +145,7 @@ def get_poly_ws15():
             nppoly.Polynomial(a4sc), nppoly.Polynomial(a5sc)]
 
 def get_poly_choi_this():
-    # Polynomial fits to Choi et al data, same orders as Wiman-Sauls 2015
+    """Polynomial fits to Choi et al data, same orders as Wiman-Sauls 2015"""
     beta_Choi_data = get_interp_data_choi()
 
     p_choi = beta_Choi_data[0]
@@ -168,31 +177,31 @@ def get_poly_rws19_this():
 
 
 dbeta_data_dict = { "RWS19" : get_interp_data_rws19(),
-                   "RWS19-interp" : get_interp_data_rws19(),
-                   "RWS19-poly" : get_poly_rws19_this(),
-                "Wiman-thesis" : get_interp_data_wiman_thesis(),
-                "Choi-interp" : get_interp_data_choi(),
-                "Choi-poly" : get_poly_choi_this(),
-                "WS15" : get_poly_ws15(),
-                "WS15-poly" : get_poly_ws15(), 
-                "SS81-interp" : get_interp_data_ss81()
-                }
+                    "RWS19-interp" : get_interp_data_rws19(),
+                    "RWS19-poly" : get_poly_rws19_this(),
+                    "Wiman-thesis" : get_interp_data_wiman_thesis(),
+                    "Choi-interp" : get_interp_data_choi(),
+                    "Choi-poly" : get_poly_choi_this(),
+                    "WS15" : get_poly_ws15(),
+                    "WS15-poly" : get_poly_ws15(), 
+                    "SS81-interp" : get_interp_data_ss81()
+                    }
 
 ######################################################################################
-### Interpolation data for other material parameters, from Greywall 1986 via RWS19 ###
+### Interpolation data for other material parameters, from RWS19                   ###
 ######################################################################################
-##'''
-#
+
 p_nodes = list(range(0, 36, 2))
 
 Tc_data_mK = [0.929, 1.181, 1.388, 1.560, 1.705, 1.828, 1.934, 2.026, 2.106, 2.177, 
       2.239, 2.293, 2.339, 2.378, 2.411, 2.438, 2.463, 2.486]
 
-# particle_density, nm^{-3}. p = 22, 34 corrected using Greywall 1986 table VI.
-# np_data = [16.28, 17.41, 18.21, 18.85, 19.34, 19.75, 20.16, 20.60, 21.01, 21.44, 21.79, 
-#        22.96, 22.36, 22.54, 22.71, 22.90, 23.22, 23.87]
+# particle_density, nm^{-3}.
 np_data = [16.28, 17.41, 18.21, 18.85, 19.34, 19.75, 20.16, 20.60, 21.01, 21.44, 21.79, 
-       22.01, 22.36, 22.54, 22.71, 22.90, 23.22, 23.54]
+       22.96, 22.36, 22.54, 22.71, 22.90, 23.22, 23.87]
+#  p = 22, 34 corrected using Greywall 1986 table VI.
+np_data_patch = [16.28, 17.41, 18.21, 18.85, 19.34, 19.75, 20.16, 20.60, 21.01, 21.44, 21.79, 
+       21.96, 22.36, 22.54, 22.71, 22.90, 23.22, 23.54]
 
 # Effective mass ratio
 mstar_m_data = [2.80, 3.05, 3.27, 3.48, 3.68, 3.86, 4.03, 4.20, 4.37, 4.53, 4.70, 4.86, 
@@ -219,26 +228,44 @@ F0a_poly = nppoly.Polynomial.fit(p_nodes, F0a_data, 5)
 # a_list = [a1[::-1]] # polyfit wants highest power first
 # b1_poly = np.polynomial.Polynomial(a1)
 
+
 ###############################################################################################################
-##########            Greywall, PLTS temperature scales polynomial coefficients                 ###############
+########## Greywall 1986 - superfluid, AB, melting transition, molar vol curves as polynomials  ###############
 ###############################################################################################################
 
 
-# From Greywall 1986
-T_pcp_mK = 2.273
-p_pcp_bar = 21.22
-p_A_bar = 34.338
-# Greywall 1986 Tc polynomial fit cofficients and constructor
+# Tc polynomial fit cofficients and constructor, Greywall 1986 Eq. 5
 aTc_G = [0.92938375, 0.13867188, -0.69302185e-2, 0.25685169e-3, -0.57248644e-5, 0.5301091e-7]
 Tc_poly_Greywall = nppoly.Polynomial(aTc_G)
-# Greywall 1986 TAB polynomial fit cofficients and constructor
+
+# Polycritical pressure, temperature, Greywall 1986 Eq. 15
+p_pcp_bar = 21.22
+T_pcp_mK = 2.273
+# TAB polynomial cofficients and constructor, Greywall 1986 Eq. 15
+# Polymonmial is function of p - p_pcp
 aTAB_G = [T_pcp_mK, -0.10322623e-1, -0.53633181e-2, 0.83437032e-3, -0.61709783e-4,  0.17038992e-5]
 TAB_poly_Greywall = nppoly.Polynomial(aTAB_G)
 
-# Melting curve poly coeffs (Greywall) 0.9 - 5.6 mK. 
+# Pressure on melting curve at superfluid A phase appearance, Greywall 1986, Eq A1
+p_A_bar = 34.338
+# Melting curve poly coeffs Greywall 1986, Eq A1. Function is T**(-3) times this polymonmial, 
+# and gives difference from p_A_bar. Works at least up to 250 mK
 aPmelt = [-0.19632970e-1, 0.61880268e-1, -0.78803055e-1, 0.13050600, -0.43519381e-1, 
-          0.13752791e-3, -0.17180436e-6, -0.220939060e-9, 0.85450245e-12] 
+          0.13752791e-3, -0.17180436e-6, -0.220939060e-9, 0.85450245e-12]
 Pmelt_poly_Greywall = nppoly.Polynomial(aPmelt)
+
+# Coefficient of C/RT polynomial at low temperature, Greywall 1986 Eq. 17
+aC_RT = [0.27840464e1, 0.69575243e-1, -0.14738303e-2, 0.46153498e-4, -0.53785385e-6]
+C_RT_poly_Greywall = nppoly.Polynomial(aC_RT)
+
+# Molar volume polynomial, Greywall 1986, Eq. 2
+aMolVol = [36.837231, -1.1803474, 0.083421417, -0.0038859562,
+    0.00009475978, -0.00000091253577,]
+V_poly_Greywall = nppoly.Polynomial(aMolVol)
+
+###############################################################################################################
+##########            Greywall - PLTS temperature scales polynomial coefficients                ###############
+###############################################################################################################
 
 # Greywall scale to PLTS scale, 6 order polynomial coefficients (Parpia et al 2022)
 # Temperature 0.9 mK to 5.6 mK
@@ -299,16 +326,18 @@ b_melt_lo = np.array([
 Tmelt_poly_PLTS_lo = nppoly.Polynomial(b_melt_lo) # convert to bar
 
 ###############################################################################################################
-##########            Tang et al PRL 1991 Magnetic Suppression of the 8 Phase ...               ###############
+##########            Wheatley RMP 1975 Experimental properties of superfluid Helium 3                                  ###############
 ###############################################################################################################
 
-data_Tan91_mag_supp_B = np.loadtxt(os.path.join(BASE_DIR, 'Tan+91_table1.csv'), delimiter=',', skiprows=2)
+data_Whe75_expt_prop = np.loadtxt(os.path.join(data_sources_dir, 'Wheatley_RMP_1975_TableIII.csv'), delimiter=',', skiprows=2)
+data_Whe75_expt_prop_df = pd.read_csv(os.path.join(data_sources_dir, 'Wheatley_RMP_1975_TableIII.csv'), header=0, skiprows=[1])
 
 ###############################################################################################################
-##########            Greywall PRB 1984 Thermal conductivity              ###############
+##########            Greywall PRB 1984 Thermal conductivity                                    ###############
 ###############################################################################################################
 
-data_Gre84_therm_cond = np.loadtxt(os.path.join(BASE_DIR, 'Greywall_1986_TableV_data.csv'), delimiter=',', skiprows=1)
+data_Gre84_therm_cond = np.loadtxt(os.path.join(data_sources_dir, 'Greywall_PRB_1984_TableV.csv'), delimiter=',', skiprows=1)
+data_Gre84_therm_cond_df = pd.read_csv(os.path.join(data_sources_dir, 'Greywall_PRB_1984_TableV.csv') )
 
 a_Gre84_table3 = [    [-4.1884746e+01, 1.9262839e+00, 0.0000000e+00],    
                     [-1.8546379e+00, 2.3695190e-01, -6.8284756e-03],    
@@ -320,3 +349,30 @@ b_Gre84_table3 = [    [2.5498997e+00, -1.1861905e-01, 1.7187787e-03],
                     [1.0311239e+03, -4.1084636e+01, 6.8188534e-01],    
                     [-3.3746517e+03, 2.2612612e+02, -3.4207801e+00],
                     [ 2.5913792e+03, -1.4574998e+02,  2.1389643e+00]]
+
+###############################################################################################################
+##########            Greywall PRB 1986 Heat capacity, latent heat                                        ###############
+###############################################################################################################
+
+data_Gre86_expt_data_df = pd.read_csv(os.path.join(data_sources_dir, 'Greywall_PRB_1986_TableII.csv') )
+
+# data_Gre86_heat_cap = np.loadtxt(os.path.join(data_sources_dir, 'Greywall_PRB_1986_TableVI.csv'), delimiter=',', skiprows=1)
+data_Gre86_heat_cap_df = pd.read_csv(os.path.join(data_sources_dir, 'Greywall_PRB_1986_TableVI.csv') )
+data_Gre86_heat_cap_df['$T_c$ (mK)'] = Tc_poly_Greywall(data_Gre86_heat_cap_df['$P\ (\mathrm{bar})$'])
+
+data_Gre86_lat_heat_df = pd.read_csv(os.path.join(data_sources_dir, 'Greywall_PRB_1986_Figure14.csv') )
+
+###############################################################################################################
+##########            Tang et al PRL 1991 Magnetic Suppression of the 8 Phase ...               ###############
+###############################################################################################################
+
+data_Tan91_mag_supp_B = np.loadtxt(os.path.join(data_sources_dir, 'Tang_et_al_PRL_1991_Table1.csv'), delimiter=',', skiprows=2)
+data_Tan91_mag_supp_B_df = pd.read_csv(os.path.join(data_sources_dir, 'Tang_et_al_PRL_1991_Table1.csv'), header=0, skiprows=[1])
+
+###############################################################################################################
+##########            Regan Wiman Sauls PRB 2019 Table 1 material parameters                    ###############
+###############################################################################################################
+
+data_RWS19_mat_pars = np.loadtxt(os.path.join(data_sources_dir, 'Regan_Wiman_Sauls_2019_Table1.csv'), delimiter=',', skiprows=2)
+data_RWS19_mat_pars_df = pd.read_csv(os.path.join(data_sources_dir, 'Regan_Wiman_Sauls_2019_Table1.csv'), header=0, skiprows=[1])
+

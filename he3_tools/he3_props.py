@@ -14,7 +14,7 @@ import numpy.polynomial as nppoly
 import he3_tools.he3_bases as h3b
 import he3_tools.he3_constants as h3c
 import he3_tools.he3_data as h3d
-import he3_tools.he3_specific_heat as h3sh
+import he3_tools.he3_heat_capacity as h3sh
 import he3_tools.he3_thermal_conductivity as h3tc
 
 SET_T_SCALE= {"Greywall", "PLTS"}
@@ -41,6 +41,9 @@ sc_corr_adj_pol = nppoly.Polynomial([0])
 
 SET_ALPHA_TYPE = {"GL", "BCS"}
 DEFAULT_ALPHA_TYPE = "GL"
+
+SET_RWS19_PATCH = {True, False}
+DEFAULT_RWS19_PATCH = True
 
 def squeeze_float(x):
     x = np.squeeze(x)
@@ -70,7 +73,7 @@ def set_default(name, xval):
     if xval in globals()[set_name]:
         globals()[name] = xval
     else:
-        raise ValueError("error: " + xval + " not in " + set_name)
+        raise ValueError("error: " + xval + " not in " + '{' + ', '.join(globals()[set_name]) +'}')
     report_setting(name)
     return 
 
@@ -116,10 +119,11 @@ def Tc_mK_expt(p):
     """
     # if scale == "PLTS":
     if DEFAULT_T_SCALE == "PLTS":
-
         return h3d.Tc_poly_PLTS(p)
-    else:
+    elif DEFAULT_T_SCALE == "Greywall":
         return h3d.Tc_poly_Greywall(p)
+    else:
+        raise ValueError('Tc_mK_expt: DEFAULT_T_SCALE in {' + ', '.join(SET_T_SCALE) +'}')
 
 def Tc_mK(p):
     """ Wrapper for Tc_mK_expt(p).
@@ -175,17 +179,20 @@ def tAB_expt(p):
 
 def p_melt(T_mK):
     """
-    Melting pressure , Greywall 1986 (equation A1). T in mK, p in bar.
-    Uses Tian, Smith, Parpia 2022 PLTS to Greywall temperature converter.
+    Melting pressure, Greywall 1986 (equation A1). T in mK, p in bar.
+    Uses Tian, Smith, Parpia 2022 PLTS to Greywall temperature converter, if 
+    required.
     """
-    if isinstance(T_mK, float) or isinstance(T_mK, int):
-        T = T_mK
-    else:
-        T = T_mK.copy()
+    # if isinstance(T_mK, float) or isinstance(T_mK, int):
+    #     T = T_mK
+    # else:
+    #     T = T_mK.copy()
+    T = np.atleast_1d(T_mK)
+    
     if DEFAULT_T_SCALE == "PLTS":
-        T = T_PLTStoG(T_mK)
+        T = T_PLTStoG(T)
     # return h3d.p_A_bar * np.ones_like(T_mK)
-    # Greywall data down to 0.9mK onlyq
+    # Greywall data down to 0.9mK only 
     T = np.maximum(T, 0.9)
     return h3d.Pmelt_poly_Greywall(T)/T**3 + h3d.p_A_bar
 
@@ -193,21 +200,16 @@ def T_melt_PLTS(p):
     """Returns melting temperataure (PLTS) as a function of pressure. 
     Uses Tian, Smith, Parpia NIMS 2022 interpolation polunomials.
     """
-    if isinstance(p, float) or isinstance(p, int):
-        pa = np.array([p])
-    else:
-        pa = p
+
+    pa = np.atleast_1d(p)
         
     dp_mbar = (pa - h3d.p_A_bar)*1e3 
 
     T_melt_mK = np.ones_like(pa)*np.nan
     T_melt_mK[pa > 29.3] = h3d.Tmelt_poly_PLTS_hi(dp_mbar[pa > 29.3])
     T_melt_mK[pa > 35.2] = h3d.Tmelt_poly_PLTS_lo(dp_mbar[pa > 35.2])
-    
-    if isinstance(p, float) or isinstance(p, int):
-        T_melt_mK = T_melt_mK[0]
-    
-    return T_melt_mK
+        
+    return squeeze_float(T_melt_mK)
 
 def T_GtoPLTS(TG):  
     """Temperature scale convertor, Greywall to PLTS, ninth order polynomial.
@@ -215,21 +217,21 @@ def T_GtoPLTS(TG):
     polynomials. For T > 100 mK, assumes linear realtio consistent with TSP value 
     at 100 mK.    
     """
-    if isinstance(TG, float) or isinstance(TG, int):
-        TGa = np.array([TG])
-    else:
-        TGa = TG
-        
+    # if isinstance(TG, float) or isinstance(TG, int):
+    #     TGa = np.array([TG])
+    # else:
+    #     TGa = TG
+    TGa = np.atleast_1d(TG)        
 
     T_PLTS_mK = np.ones_like(TGa)*np.nan
     T_PLTS_mK[TGa <= 5.6] = h3d.GtoPLTS_low_poly(TGa[TGa <= 5.6])
-    T_PLTS_mK[TGa > 5.6] = h3d.GtoPLTS_high_poly(TGa[TGa > 5.6])
-    T_PLTS_mK[TGa > 100] = TGa[TGa > 100] - 100.0 + h3d.GtoPLTS_high_poly(100)
+    T_PLTS_mK[TGa >  5.6] = h3d.GtoPLTS_high_poly(TGa[TGa > 5.6])
+    T_PLTS_mK[TGa >  100] = TGa[TGa > 100] - 100.0 + h3d.GtoPLTS_high_poly(100)
     
-    if isinstance(TG, float) or isinstance(TG, int):
-        T_PLTS_mK = T_PLTS_mK[0]
+    # if isinstance(TG, float) or isinstance(TG, int):
+    #     T_PLTS_mK = T_PLTS_mK[0]
 
-    return T_PLTS_mK
+    return squeeze_float(T_PLTS_mK)
 
 def T_PLTStoG(TPLTS):
     """Temperature scale converter, invert Greywall to PLTS, ninth order polynomial 
@@ -238,11 +240,20 @@ def T_PLTStoG(TPLTS):
     """
     return h3d.PLTStoG9_high_poly(TPLTS)
 
+###############################################################################################################
+##########        General properties. Currently from Regan, Wiman, Sauls 2019 Table 1           ###############
+###############################################################################################################
+
 def npart(p):
     """Particle density at pressure p bar ($nm^{-3}$).
     """
     # return np.interp(p, p_nodes, np_data)
-    return np.interp(p, h3d.p_nodes, h3d.np_data, left=0.5*h3d.np_data[0], right=2.0*h3d.np_data[-1])
+    if DEFAULT_RWS19_PATCH:
+        n_part = h3d.np_data_patch
+    else:
+        n_part = h3d.np_data
+        
+    return np.interp(p, h3d.p_nodes, n_part, left=0.5*n_part[0], right=2.0*n_part[-1])
 
 def molar_vol_cm3(p):
     """Molar volume at pressure p bar ($cm^{3}$).
@@ -250,12 +261,17 @@ def molar_vol_cm3(p):
     return (1e-7)**3 * h3c.N_A / npart(p)
 
 def p_bar_from_molar_vol_cm3(V):
-    """Pressure p bar at molar volume ($cm^{3}$). Interpolation. 
+    """Pressure p bar at molar volume ($cm^{3}$). Interpolation of RWS19 table 1. 
     """
     V_nm3 = V*1e7**3 # molar volume in nm^3
     npart = h3c.N_A/V_nm3
     # print(npart)
-    return np.interp(npart, h3d.np_data, h3d.p_nodes)
+    if DEFAULT_RWS19_PATCH:
+        np_data = h3d.np_data_patch
+    else:
+        np_data = h3d.np_data
+    
+    return np.interp(npart, np_data, h3d.p_nodes)
 
 def mstar_m(p):
     """Effective mass ratio at pressure p bar.
@@ -292,13 +308,134 @@ def F0a(p):
     """Landau parameter $F_0^a$."""
     return h3d.F0a_poly(p)
 
+###############################################################################################################
+##########            Greywall 1986 Phys Rev B29 polynomials. See also Tc_mK_expt(p)            ###############
+###############################################################################################################
+
+def molar_volume(p_bar):
+    """
+    Compute the molar volume V (cm^3/mol) at pressure p_bar (bar) using:
+    $$
+        V = \sum_{i=0}^{5} a_i * (p/{\rm bar})**i
+    $$
+    Source: Greywall PRB 1986 Eq. 2. Fit to data in Wheatley 1975.
+
+    Parameters
+    ----------
+    p_bar : float, numpy.ndarray
+        Pressure in bars.
+
+    Returns
+    -------
+    float, numpy.ndarray
+        Molar volume in cm^3/mol.
+        
+    Produced with scan and CoPilot.
+    """
+    p = np.atleast_1d(p_bar)
+    V = h3d.V_poly_Greywall(p)
+    return squeeze_float(V)
+
+def C_RT(p_bar):
+    """
+    Compute the ratio $C/RT = \gamma$ at pressure p_bar (bar), where $R$ is 
+    gas constant and $T$ is temperature. 
+    
+    Uses:
+    $$
+        \gamma = \sum_{i=0}^{4} a_i * (p/{\rm bar})**i
+    $$
+    Source: Greywall PRB 1986 Eq. 17. Fit to data also from Greywall, Table II
+
+
+    Parameters
+    ----------
+    p_bar : float, numpy.ndarray
+        Pressure in bar.
+
+    Returns
+    -------
+    float, numpy.ndarray
+        Ratio C/RT in K$^{-1}$.
+        
+    Produced with scan and CoPilot.
+    """
+    p = np.atleast_1d(p_bar)
+    Cratio = h3d.C_RT_poly_Greywall(p)
+    return squeeze_float(Cratio)
+
+
+###############################################################################################################
+##########   Functions for computing quantities derived from molar volume and heat capacity     ###############
+###############################################################################################################
+
+
+def N0_from_C_RT_V(p):
+    """Density of states per spin calculated from low T normal phase 
+    heat capacity and molar volume, as obtained from Greywall 1986 polynomials.
+    
+    Molar volume: Eq. 2.
+    Very low T heat capacity divided by RT: Eq. 17.
+    
+    Units: 1/J/nm^3
+    """
+    Cratio = C_RT(p) 
+    V = molar_volume(p) * 1e7**3 # nm^3 per mol
+    denom = (np.pi**2/3) * h3c.kB * V / h3c.N_A
+    return 0.5 * Cratio/denom
+    
+def pf_from_V(p):
+    """Fermi momentum calculated from molar volume, calculated from Greywall 
+    1986 polynomial.
+
+    Molar volume: Eq. 2.
+    
+    Units: kg m /s """
+    V = molar_volume(p) * 1e-2**3 # m^3 per mol
+    return h3c.hbar * (2*np.pi) * (3/(8*np.pi) * h3c.N_A/V)**(1/3.)
+
+def mstar_m_from_N0_pf(p):
+    """Effective mass ratio from density of states and Fermi momentum, derived 
+    from Greywall 1986 polynomials for molar volume and v low T heat capacity. 
+    
+    Density of states: N0_from_C_RT_V
+    Fermi momentum: pf_from_V
+    
+    Dimensionless, unitless.
+    """
+    N0_m3_J = N0_from_C_RT_V(p)*(1e9)**3
+    pf = pf_from_V(p)
+    return (h3c.hbar * (2*np.pi))**3/(8*np.pi*h3c.mhe3_kg) * (2*N0_m3_J/pf)
+
+def vf_from_pf_mstar_m(p):
+    """Fermi velocity calculated from Fermi momentum and effective mass, 
+    calculated from Greywall 1986 polynomials.
+    
+    Units: m / s """
+    
+    mstar = mstar_m_from_N0_pf(p)*h3c.mhe3_kg
+    return pf_from_V(p)/mstar
+
+def xi0_from_vf_Tc(p):
+    """Cooper pair correlation length calculated from Fermi velocity and Tc 
+    (superfluid critical temperature) calculated from Greywall 1986 polynomials.
+    
+    Units: nm """
+    
+    return h3c.hbar * vf_from_pf_mstar_m(p)/(2 * np.pi * h3c.kB * Tc_mK_expt(p)*1e-3) * 1e9
+
+###############################################################################################################
+##########   End functions                                                                      ###############
+###############################################################################################################
+
+
 def xi(t, p, squeeze_me=True, diagonal=False):
     """Ginzburg Landau correlation length at pressure p bar (nm).
     """
     t_a = np.float64(np.atleast_1d(t))
     p_a = np.float64(np.atleast_1d(p))
     
-    print(type(t_a), type(alpha_norm(t_a)))
+    # print(type(t_a), type(alpha_norm(t_a)))
     if diagonal:
         x = 1/(-alpha_norm(t_a))**0.5 * h3c.xiGL_const*xi0(p_a)
     else:
@@ -328,6 +465,8 @@ def xi_delta(t, p, squeeze_me=True, diagonal=False):
     
 def N0(p):
     """Single-spin density of states at Fermi surface, units nm$^{-3}$ J$^{-1}$.
+    
+    Calculated from quantities given in Table 1 of Regan, Wiman, Sauls 2019.
     """
     return npart(p) * 1.5 / (h3c.mhe3_kg * mstar_m(p) * vf(p)**2)
 
