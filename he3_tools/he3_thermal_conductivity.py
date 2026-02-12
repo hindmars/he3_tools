@@ -58,7 +58,7 @@ def kappa_0(t, p):
     return k0
 
 
-def thermal_conductivity_vlow(V, T):
+def thermal_conductivity_vlow(V, T_K):
     """
     Experimental very low temperature thermal conductivity, Greywall Phys. Rev. B29, 
     4933 (1984). Interpolated from Table V.
@@ -70,14 +70,17 @@ def thermal_conductivity_vlow(V, T):
         kappa (float): thermal conductivity in erg/sec cm K
     """
 
+    T = np.atleast_1d(T_K)
     # p_data = h3d.data_Gre84_therm_cond[:, 0]
     V_data = h3d.data_Gre84_therm_cond[:, 1]
     kappaT_data = h3d.data_Gre84_therm_cond[:, 4]
     b_data = h3d.data_Gre84_therm_cond[:, 6]
     
-    kappaT0_interp = np.interp(V, V_data, kappaT_data) 
+    # numpy.interp works only for monotonic increasing data, whereas 
+    # V_data is monotonic decreasing
+    kappaT0_interp = np.interp(-V, -V_data, kappaT_data) 
     a = 1/kappaT0_interp
-    b = np.interp(V, V_data, b_data) 
+    b = np.interp(-V, -V_data, b_data) 
     
     kappaT_interp = 1/(a + b*T)
 
@@ -169,9 +172,9 @@ def thermal_conductivity_Greywall84(V, T):
     kappa = np.zeros_like(T)
     kappa[low_T] = thermal_conductivity_low(V, T[low_T])  
     kappa[~low_T] = thermal_conductivity_high(V, T[~low_T])
-    return kappa
+    return h3p.squeeze_float(kappa)
 
-def thermal_conductivity_normal_liquid(T, p, units='default', T_K_lowest= 0.007):
+def thermal_conductivity_normal_liquid(T_K, p, units='default', T_K_lowest= 0.007):
     """
     Thermal conductivity from Greywall 1984.
     Selects Eq. (6) for T < 0.05 K and Eq. 7) for T >= 0.05 K.
@@ -189,7 +192,7 @@ def thermal_conductivity_normal_liquid(T, p, units='default', T_K_lowest= 0.007)
         kappa (float): thermal conductivity in chosen units
 
     """
-    T = np.atleast_1d(T)
+    T = np.atleast_1d(T_K)
     vlow_T = T < T_K_lowest
     low_T = (T_K_lowest <= T) & (T < T_thresh)
     high_T = T_thresh <= T
@@ -212,7 +215,7 @@ def thermal_conductivity_normal_liquid(T, p, units='default', T_K_lowest= 0.007)
     else:
         factor = conv_erg_sec_cm_K_SI * 1e-18
         
-    return kappa_arr*factor
+    return h3p.squeeze_float(kappa_arr)*factor
 
 def kappa(t, p, units='default', T_K_lowest= 0.007):
     """

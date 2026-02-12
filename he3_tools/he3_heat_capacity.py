@@ -185,7 +185,7 @@ def heat_capacity_Greywall(V, T):
     C_R[~low_T] = heat_capacity_high(V, T[~low_T])
     return C_R
 
-def heat_capacity_normal_liquid(T, p, units='default', T_K_lowest=0.007):
+def heat_capacity_normal_liquid(T_K, p, units='default', T_K_lowest=0.007):
     r"""
     Heat caoacity from Greywall Phys Rev B27, 2747 (1983) & B29, 7520 (1986)
     For T < T_K_lowest selects C_V/RT from 1986 paper.
@@ -206,7 +206,7 @@ def heat_capacity_normal_liquid(T, p, units='default', T_K_lowest=0.007):
         Cv (float): heat capacity in chosen units
 
     """
-    T = np.atleast_1d(T)
+    T = np.atleast_1d(T_K)
     vlow_T = T < T_K_lowest
     low_T = (0.007 <= T) & (T <= 0.1)
     high_T = 0.1 < T
@@ -228,6 +228,8 @@ def heat_capacity_normal_liquid(T, p, units='default', T_K_lowest=0.007):
         factor = h3c.R / V_m3
     elif units == 'dimless':
         factor = (h3c.R/h3c.kB) / V_m3 * (h3p.xi(0, p)*1e-9)**3
+    elif units == 'eV_um3_mK':
+        factor =  (1e-6)**3 * (1e-3) * (h3c.R / V_m3) / h3c.cphy['electron volt'][0]
     else: # he3_tools uses J / K / nm^3
         factor = h3c.R / V_m3 * (1e-9)**3
             

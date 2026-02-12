@@ -1085,14 +1085,21 @@ def thermal_diffusivity(t, p):
     """
     return h3tc.kappa(t, p)/h3sh.C_V_normal(t, p)
 
-def thermal_diffusivity_norm(t, p):
+def thermal_diffusivity_norm(t, p, units='dimless'):
     r"""
     Dimensionless thermal diffusivity, defined as
     $$
     D_t t_{\rm GL} / \xi_{\rm GL}^2
     $$
     where $\xi_{\rm GL}$ is the zero-temperature GL coherence length and 
-    $t_{\rm GL} = \xi_{\rm GL}/v_f$ is the GL time.    
+    $t_{\rm GL} $ is the GL time.  This is defined in two different ways:
+        "dimless" : $t_{\rm GL} = \xi_{\rm GL}/v_f$ 
+        "dimlessB" or "dyGiLa" : $t_{\rm GL}^B = \sqrt{5/3} \xi_{\rm GL}/v_f$ 
+        "nm^2/ns" : 
+        "SI" : 
+        
+    The second form accounts for the units used in dyGiLa.
+        
 
     Parameters
     ----------
@@ -1100,6 +1107,8 @@ def thermal_diffusivity_norm(t, p):
         Reduced temperature, $T/T_c$.
     p : float, int, numpy.ndarray
         Pressure in bar.
+    units : str
+        type of dimension units, either dimless, dimlessB/dyGiLa, nm^2/ns, SI
 
     Only one or other of t and p can be an array.
 
@@ -1109,7 +1118,18 @@ def thermal_diffusivity_norm(t, p):
         Thermal diffusivity.
 
     """
-    return thermal_diffusivity(t, p) * tGL(p) / xi(0, p)**2
+    if units == 'dimlessB' or units == 'dyGiLa':
+        factor = np.sqrt(5/3) * tGL(p) / xi(0, p)**2
+    elif units == 'nm^2/ns':
+        factor = 1.0
+    elif units == 'dimless':
+        factor = tGL(p) / xi(0, p)**2
+    elif units == 'SI':
+        factor = 1e-9
+    else:
+        print('thermal_diffusivity_norm: No units specified, factor = 1.0')
+        factor = 1.0
+    return factor * thermal_diffusivity(t, p) 
 
 def diffusion_relaxation_length(p):
     r"""

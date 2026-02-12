@@ -13,6 +13,8 @@ import numpy as np
 from scipy.optimize import fsolve
 
 import he3_tools.he3_props as h3p
+import he3_tools.he3_heat_capacity as h3hc
+import he3_tools.he3_thermal_conductivity as h3tc
 import he3_tools.he3_constants as h3c
 import he3_tools.he3_magnetic as h3m
 
@@ -53,8 +55,8 @@ def hot_blob_length_scale(p, phase='A'):
         Length scale of the heated region, in nm..
 
     """
-    C_V_Tc = h3p.C_V_normal(1, p) + h3p.delta_C_V_Tc(p, phase)
-    return (h3p.Tc_mK(p)/1000 * C_V_Tc/h3c.c.e)**(-1/3)
+    C_V_Tc = h3hc.C_V_normal(1, p) + h3hc.delta_C_V_Tc(p, phase)
+    return (h3hc.Tc_mK(p)/1000 * C_V_Tc/h3c.c.e)**(-1/3)
 
 def hot_blob_size(t, p, Q_eV, phase='A',):
     """
@@ -112,7 +114,35 @@ def hot_blob_quench_time(t, p, Q_eV=1.0, phase='A'):
         Quench time for hot blob, in ns..
 
     """
-    return hot_blob_size(t, p, Q_eV, phase='A')**2/h3p.thermal_diffusivity(t, p) *1/(1-t)
+    return hot_blob_size(t, p, Q_eV, phase='A')**2/h3tc.thermal_diffusivity(t, p) *1/(1-t)
+
+# def hot_blob_max_radius_time(t, p, Q_eV=1.0, phase='A'):
+#     """
+#     Time of maximum radius of a normal region produced by Q_eV energy, injected into 
+#     superfluid in given phase at reduced temperature t. 
+    
+#     Units: ns.
+    
+#     Parameters
+#     ----------
+#     t : float, int, numpy.ndarray 
+#         Reduced temperature (T/Tc).
+#     p : float, int, numpy.ndarray 
+#         Pressure in bar.
+#     Q_eV : float, int, numpy.ndarray 
+#         Deposited heat energy in eV.
+#     phase : str
+#         Thermodynamic superfuid phase ('A' or 'B')
+
+
+#     Returns
+#     -------
+#     type(p)
+#         Time of max radius for hot blob, in ns..
+
+#     """
+#     return hot_blob_size(t, p, Q_eV, phase='A')**2/h3tc.thermal_diffusivity(t, p) *1/(1-t)
+
 
 def truncated_sphere_volume(Rn, h):
     """
@@ -169,7 +199,7 @@ def truncated_sphere_radius(vol, h):
 
 def hot_blob_vol(t, p, Q_eV, phase='A'):
 
-    C_V_Tc = h3p.C_V_normal(1, p) + h3p.delta_C_V_Tc(p, phase)
+    C_V_Tc = h3hc.C_V_normal(1, p) + h3hc.delta_C_V_Tc(p, phase)
     integral_t3_dt = 0.25*(1 - t**4)
 
     heat_eV_per_vol = (h3p.Tc_mK(p)/1000) * integral_t3_dt * C_V_Tc / h3c.c.e
@@ -178,7 +208,7 @@ def hot_blob_vol(t, p, Q_eV, phase='A'):
 
     return vol_nm3
 
-def hot_blob_radius(t, p, Q_eV, h, phase='A', model='average'):
+def hot_blob_radius(t, p, Q_eV, h=np.inf, phase='A', model='average'):
     
     vol_nm3 = hot_blob_vol(t, p, Q_eV, phase)
     
@@ -243,7 +273,7 @@ def hot_blob_critical_energy_eV(t, p, H=0,
     
     vol = hot_blob_volume(Rc, cell_height) * (np.exp(0)/6)**(dim/2) * (1/geo_fac)**dim * (1 - t)
     
-    return vol * h3p.C_V_normal(1, p)*h3p.Tc_mK(p)/1e3/h3c.c.e, dim
+    return vol * h3hc.C_V_normal(1, p)*h3p.Tc_mK(p)/1e3/h3c.c.e, dim
 
 def critical_radius_confined_eV(t, p, H=0, 
                                 sigma_wall=None, 
@@ -303,7 +333,7 @@ def critical_radius_confined_eV(t, p, H=0,
     
     vol = hot_blob_volume(Rc, cell_height) * (np.exp(0)/6)**(dim/2) * (1/geo_fac)**dim * (1 - t)
     
-    return vol * h3p.C_V_normal(1, p)*h3p.Tc_mK(p)/1e3/h3c.c.e, dim, 
+    return vol * h3hc.C_V_normal(1, p)*h3p.Tc_mK(p)/1e3/h3c.c.e, dim, 
 
 def rhul_cell_rate_cdf(E_eV):
     """
@@ -359,4 +389,90 @@ def rhul_lifetime_to_eV(life, efficiency=1.0, vol=rhul_lake_vol_mm3[1]):
         Qi_eV[n] = fsolve(lambda E_eV: rhul_cell_rate_cdf(E_eV/efficiency)*vol/rhul_lake_vol_mm3[0] - rx, x0=0.03)
     
     return Qi_eV
+    
+def tmax_from_hot_blob_radius(p, Rmax_nm, units='dimless'):
+    """
+    Get the time at which the hot blob reaches maximum radius Rmax_nm, given in 
+    nm.  The units can be chosen to be:
+        dimless (length unit T=0) GL coherence length divided by Fermi velocity at pressure p)
+        dimlessB or dyGiLa: time unit used by dyGila, sqrt(5/3) times dimless
+        SI
+
+    Parameters
+    ----------
+    p : int, float or array
+        Pressure in bar.
+    Rmax_nm : int, float or array
+        Target hot blob size in nm.
+    units : str, optional
+        DESCRIPTION. The default is 'dimless'.
+
+    Returns
+    -------
+    tmax : float or array
+        Time at which the hot blob reaches maximum radius.
+
+    """
+    tmax = (Rmax_nm/h3p.xi(0,p))**2/(6 * h3p.thermal_diffusivity_norm(1, p, units))
+    return tmax
+    
+# def hot_blob_radius_at_tmax(p, tmax, units='default'):
+#     if units == 'dimless':
+#         factor = 1.0
+#     elif units == 'dimlessB':
+#         factor = np.sqrt(5/3)
+#     else:
+#         factor = h3p.xi(0,p)
+#     Rmax = np.sqrt(6 * h3p.thermal_diffusivity_norm(1, p, units) * tmax) * factor
+#     return Rmax
+
+def central_tred_at_tmax(t):
+    """
+    Central reduced temperature of hot blob at time of maximum radius tmax, 
+    for a bulk reduced temperature t.
+    
+    For dyGiLa parameters, the bulk temperature is Ttdb0 and this function returns 
+    Ttdb1.
+
+    Parameters
+    ----------
+    t : float or array
+        Reduced temperature outside hot blob.
+
+    Returns
+    -------
+    float or array
+        Central reduced temperature of hot blob at tmax.
+
+    """
+    
+    return np.exp(1.5) * (1 -t) + t
+    
+def dyGiLa_params_hot_blob(t, p, Rmax_nm):
+    """
+    
+
+    Parameters
+    ----------
+    t : float or array
+        Reduced temperature in bulk, $T_0/T_c$.
+    p : float or array
+        Pressure in bar.
+    Rmax_nm : float or array
+        Target hot blob radius in nm.
+
+    Returns
+    -------
+    dict
+        Parameters for dyGiLa input file: 'Ttdb0', 'Ttdb1', 't1'.
+
+    """
+    
+    Ttdb0 = t
+    Ttdb1 = central_tred_at_tmax(t)
+    t1 = tmax_from_hot_blob_radius(p, Rmax_nm, units='dyGiLa')
+    
+    return {'Ttdb0'  : Ttdb0, 'Ttdb1'  : Ttdb1, 't1' : t1}
+    
+    
     

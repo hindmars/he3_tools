@@ -42,7 +42,7 @@ fig, ax = plt.subplots(figsize=(4, 5))
 
 for p, V in zip(p_arr, V_arr):
     T_arr = np.logspace(np.log10(he3.Tc_K(p)), 0.0, 500)
-    ax.loglog(T_arr, he3.thermal_conductivity_normal_liquid(T_arr, p, units='cgs', T_K_lowest=1e-3), label = f'{V:.2f}')
+    ax.loglog(T_arr, he3.thermal_conductivity_normal_liquid(T_arr, p, units='cgs', T_K_lowest=7e-3), label = f'{V:.2f}')
 
 ax.set_xlabel(r'$T/$K')
 ax.set_ylabel(r'$\kappa/$ erg s$^{-1}$ cm$^{-1}$ K$^{-1}$')
