@@ -20,6 +20,8 @@ from scipy.optimize import bisect
 # import scipy.optimize.nonlin
 from scipy.optimize import NoConvergence
 
+DEFAULT_NK_x_rtol = 1e-5
+
 def uB_mag_norm(delta_ss, t, p, H):
     if isinstance(p, int):
         p = float(p)
@@ -397,7 +399,7 @@ def find_mag_phase(phase, *args):
     else:
         raise ValueError('find_mag_phase: only phase = A or B implemented.')
     try:
-        A = newton_krylov(F, A_init)
+        A = newton_krylov(F, A_init, x_rtol=DEFAULT_NK_x_rtol)
     except NoConvergence as e:
         A = e.args[0]
         print('find_mag_phase: no Convergence')
@@ -550,7 +552,7 @@ def critical_radius(t_in, p_in, H=0, sigma=0.95, dim=3):
     # elif isinstance(sigma_fun, np.ndarray):
         # sigma_AB = sigma_fun*np.abs(f_B_norm(t,p))*xi(t,p)
     
-    return np.squeeze((dim-1)*sigma_AB/(f_A_mag_norm - f_B_mag_norm))
+    return h3p.squeeze_float((dim-1)*sigma_AB/(f_A_mag_norm - f_B_mag_norm))
 
 def critical_energy(t_in, p_in, H=0, sigma=0.95, dim=3):
     """Energy of thin-wall critical bubble, in nm, with magnetic field.
