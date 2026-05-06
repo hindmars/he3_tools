@@ -554,8 +554,12 @@ def critical_radius(t_in, p_in, H=0, sigma=0.95, dim=3):
     
     return h3p.squeeze_float((dim-1)*sigma_AB/(f_A_mag_norm - f_B_mag_norm))
 
-def critical_energy(t_in, p_in, H=0, sigma=0.95, dim=3):
-    """Energy of thin-wall critical bubble, in nm, with magnetic field.
+def critical_energy(t_in, p_in, H=0, cell_height=np.inf, sigma=0.95):
+    """Energy of thin-wall critical bubble, with magnetic field.  
+    If cell_height_nm is not np.inf, returns the energy of critical "cylinder" 
+    in confined geometry.
+    
+    
     Ideally will optionally use function to get surface tension. 
     Uses approximations for free energy and surface energy.
     
@@ -577,11 +581,14 @@ def critical_energy(t_in, p_in, H=0, sigma=0.95, dim=3):
             f_B_mag_norm = f_phase_mag_norm('B', t, p, H)
             f_A_mag_norm = f_phase_mag_norm('A', t, p, H)
             sigma_AB = sigma*np.abs(f_B_mag_norm)*h3p.xi(t, p)
-            r_c = critical_radius(t, p, H, sigma, dim)
+            if cell_height == np.inf:
+                r_c = critical_radius(t, p, H, sigma, dim=3)
+                Ec[m, n] = 4*np.pi*(r_c**2*sigma_AB - (1/3)*r_c**3*np.abs(f_B_mag_norm - f_A_mag_norm) )
+            else:
+                r_c = critical_radius(t, p, H, sigma, dim=2)
+                Ec[m, n] = np.pi*(2*r_c*sigma_AB - r_c**2*np.abs(f_B_mag_norm - f_A_mag_norm) )*cell_height
     
-            Ec[m, n] = 4*np.pi*(r_c**2*sigma_AB + (1/3)*r_c**3*(f_B_mag_norm - f_A_mag_norm) )
-    
-    return np.squeeze(Ec * h3p.f_scale(p)/(h3c.kB * h3p.Tc_mK(p)*1e-3))
+    return np.squeeze(Ec * h3p.f_scale(p)/(h3c.kB * h3p.Tc_K(p)))
 
 def delta_tAB_mag_expt(p, H):
     

@@ -30,6 +30,12 @@ rhul_lake_vol_mm3[5] = 0.120
 
 rhul_lake_vol_mm3[0] = np.sum(rhul_lake_vol_mm3[1:])
 
+schiffer_tube_vol_mm3 = np.zeros((3,))
+schiffer_tube_vol_mm3[1] = 10.0 * (5.708 + 4.656) * 1.0
+schiffer_tube_vol_mm3[2] = 10.0 * (5.685 + 12.541) * 1.0
+
+schiffer_tube_vol_mm3[0] = np.sum(schiffer_tube_vol_mm3[1:])
+
 #%%
 
 def hot_blob_length_scale(p, phase='A'):
@@ -193,9 +199,12 @@ def truncated_sphere_radius(vol, h):
     """
     vol = np.atleast_1d(vol)
     
-    Rb = fsolve(lambda Rn: truncated_sphere_volume(Rn, h) - vol, x0 = h )
+ 
+    Rn_list = []
+    for V in vol:
+        Rn_list.append( fsolve(lambda Rn: truncated_sphere_volume(Rn, h) - V, x0 = h )[0])
         
-    return Rb
+    return np.array(Rn_list)
 
 def hot_blob_vol(t, p, Q_eV, phase='A'):
 
@@ -232,19 +241,24 @@ def hot_blob_radius(t, p, Q_eV, h=np.inf, phase='A', model='average'):
 
     return Rb_arr
 
-def hot_blob_critical_energy_eV(t, p, H=0, 
-                                Rc_fac=1.0, 
-                                geo_fac=(4*np.pi)**(-0.5), 
-                                cell_height=np.inf):
+def hot_blob_energy_eV(Rn, t, p, cell_height=np.inf, 
+                       geo_fac=(4*np.pi)**(-1.5)):
     """
-    Energy required to make a hot blob of same size as critical bubble.
+    Energy required to make a hot blob in the shape of a truncated sphere of 
+    radius Rn (averaged over blob centre positions).
+    
+    Approximates specific heat by normal phase specific heat at Tc
 
     Parameters
     ----------
+    Rn : float, int, numpy.ndarray 
+        Hot blob radius
     t : float, int, numpy.ndarray 
         Reduced temperature (T/Tc).
     p : float, int, numpy.ndarray 
         Pressure in bar.
+    cell_height: float, optional
+        Length of confined dimension in nm
     geo_fac : float, optional
         Geometrical/algebraic factor. The default is (4*np.pi)**(-1.5).
 
@@ -257,23 +271,77 @@ def hot_blob_critical_energy_eV(t, p, H=0,
     
     t = np.atleast_1d(t)
     
-    Rc3 = h3m.critical_radius(t, p, H, dim=3)*Rc_fac
-    Rc2 = h3m.critical_radius(t, p, H, dim=2)*Rc_fac
+    # Rc3 = h3m.critical_radius(t, p, H, dim=3)*Rc_fac
+    # Rc2 = h3m.critical_radius(t, p, H, dim=2)*Rc_fac
+    # Rc3 = np.atleast_1d(Rc3)
+    # Rc2 = np.atleast_1d(Rc2)
 
-    Rc = Rc3
-    dim=3*np.ones_like(t) 
+    # Rc = Rc3
+    # dim=3*np.ones_like(t) 
     
-    hot_puck = Rc3 > cell_height
-    intermediate = (Rc3 < cell_height) & (Rc3 > cell_height/2)
-    dim[hot_puck] = 2
-    Rc[hot_puck] = Rc2[hot_puck]
+    # hot_puck = Rc3 > cell_height
+    # intermediate = (Rc3 < cell_height) & (Rc3 > cell_height/2)
+    # dim[hot_puck] = 2
+    # Rc[hot_puck] = Rc2[hot_puck]
 
-    dim[intermediate] = 3 - 2*(Rc3[intermediate] - cell_height/2)/cell_height
-    Rc[intermediate] = Rc3[intermediate]*(dim[intermediate]-2) + Rc2[intermediate]*(3 - dim[intermediate]) 
+    # dim[intermediate] = 3 - 2*(Rc3[intermediate] - cell_height/2)/cell_height
+    # Rc[intermediate] = Rc3[intermediate]*(dim[intermediate]-2) + Rc2[intermediate]*(3 - dim[intermediate]) 
     
-    vol = hot_blob_volume(Rc, cell_height) * (np.exp(0)/6)**(dim/2) * (1/geo_fac)**dim * (1 - t)
+    vol_factor = truncated_sphere_volume(Rn, cell_height)*3/(4*np.pi)
+    diffu_factor = (np.exp(0)/6)**(1.5) * (1/geo_fac) * (1 - t)
     
-    return vol * h3hc.C_V_normal(1, p)*h3p.Tc_mK(p)/1e3/h3c.c.e, dim
+    return vol_factor*diffu_factor * h3hc.C_V_normal(1, p)*h3p.Tc_K(p)/h3c.c.e
+
+def critical_energy_confined_eV(t, p, H=0, 
+                                cell_height_nm=np.inf, 
+                                sigma_wall=None):
+    """
+    Critical bubble energy in confined geometry.
+
+    Parameters
+    ----------
+    t : float, int, numpy.ndarray 
+        Reduced temperature (T/Tc).
+    p : float, int, numpy.ndarray 
+        Pressure in bar.
+    H : float, optional
+        Magnetic field in tesla.
+    cell_height: float, optional
+        Length of confined dimension in nm
+        
+    Returns
+    -------
+    type(t) or type(p).
+        Energy (eV) of critical bubble
+
+    """
+
+    if sigma_wall is None:
+        Ec3 = h3m.critical_energy(t, p, H)
+        Ec2 = h3m.critical_energy(t, p, H, cell_height_nm)
+    elif isinstance(sigma_wall, float):
+        Ec3 = h3m.critical_energy(t, p, H)
+        Ec2 = h3m.critical_energy(t, p, H, cell_height_nm)
+    else:
+        raise ValueError('critical_energy_confined_eV: sigma_wall must be None or float')
+    
+    t = np.atleast_1d(t)
+    
+    bulk_bubble = (Ec3 < Ec2)
+    
+    # Rc3_nm = h3m.critical_radius(t, p, H, dim=3)
+    # Rc2_nm = h3m.critical_radius(t, p, H, dim=2)
+    
+    # print(Rc3_nm, Ec3)
+    # print(Rc2_nm, Ec2)
+    
+    Ec_conf = np.zeros_like(Ec3)
+    
+    Ec_conf[bulk_bubble] = Ec3[bulk_bubble]
+    Ec_conf[~bulk_bubble] = Ec2[~bulk_bubble]
+    
+    return Ec_conf
+
 
 def critical_radius_confined_eV(t, p, H=0, 
                                 sigma_wall=None, 
@@ -281,7 +349,7 @@ def critical_radius_confined_eV(t, p, H=0,
                                 cell_height=np.inf, 
                                 z0=0):
     """
-    Critical bubble in confined geometry.
+    Critical bubble radius in confined geometry.
 
     Parameters
     ----------
@@ -315,23 +383,25 @@ def critical_radius_confined_eV(t, p, H=0,
     Rc3 = h3m.critical_radius(t, p, H, dim=3)
     Rc2 = h3m.critical_radius(t, p, H, dim=2)
 
-    z0abs = np.abs(z0)
-    case0 = Rc3 < (0.5 - z0abs) # free bulk 3D bubble, no walls touched
-    case2 = Rc2 > (0.5 + z0abs) # effectively 2D bubble filling cell height, touching two walls
-    case1 = (Rc3 < (0.5 - z0abs)) & (Rc2 < (0.5 + z0abs)) # touching one wall only ?
 
-    Rc[case0] = Rc3
+
+    # z0abs = np.abs(z0)
+    # case0 = Rc3 < (0.5 - z0abs) # free bulk 3D bubble, no walls touched
+    # case2 = Rc2 > (0.5 + z0abs) # effectively 2D bubble filling cell height, touching two walls
+    # case1 = (Rc3 < (0.5 - z0abs)) & (Rc2 < (0.5 + z0abs)) # touching one wall only ?
+
+    # Rc[case0] = Rc3
 
     
-    hot_puck = Rc3 > cell_height
-    intermediate = (Rc3 < cell_height) & (Rc3 > cell_height/2)
-    dim[hot_puck] = 2
-    Rc[hot_puck] = Rc2[hot_puck]
+    # hot_puck = Rc3 > cell_height
+    # intermediate = (Rc3 < cell_height) & (Rc3 > cell_height/2)
+    # dim[hot_puck] = 2
+    # Rc[hot_puck] = Rc2[hot_puck]
 
-    dim[intermediate] = 3 - 2*(Rc3[intermediate] - cell_height/2)/cell_height
-    Rc[intermediate] = Rc3[intermediate]*(dim[intermediate]-2) + Rc2[intermediate]*(3 - dim[intermediate]) 
+    # dim[intermediate] = 3 - 2*(Rc3[intermediate] - cell_height/2)/cell_height
+    # Rc[intermediate] = Rc3[intermediate]*(dim[intermediate]-2) + Rc2[intermediate]*(3 - dim[intermediate]) 
     
-    vol = hot_blob_volume(Rc, cell_height) * (np.exp(0)/6)**(dim/2) * (1/geo_fac)**dim * (1 - t)
+    # vol = hot_blob_volume(Rc, cell_height) * (np.exp(0)/6)**(dim/2) * (1/geo_fac)**dim * (1 - t)
     
     return vol * h3hc.C_V_normal(1, p)*h3p.Tc_mK(p)/1e3/h3c.c.e, dim, 
 
@@ -364,7 +434,7 @@ def rhul_cell_rate_cdf(E_eV):
 def rhul_lifetime_to_eV(life, efficiency=1.0, vol=rhul_lake_vol_mm3[1]):
     """
     Converts a lifetime (hours scaled to Lake 1) in the RHUL experiment to a minimum 
-    ebergy, using the event rate CDF derived from 
+    energy, using the event rate CDF derived from 
 
     Parameters
     ----------
@@ -471,8 +541,9 @@ def dyGiLa_params_hot_blob(t, p, Rmax_nm):
     Ttdb0 = t
     Ttdb1 = central_tred_at_tmax(t)
     t1 = tmax_from_hot_blob_radius(p, Rmax_nm, units='dyGiLa')
+    Dctxi = h3p.thermal_diffusivity_norm(1, p, units='dyGiLa')
     
-    return {'Ttdb0'  : Ttdb0, 'Ttdb1'  : Ttdb1, 't1' : t1}
+    return {'Ttdb0'  : Ttdb0, 'Ttdb1'  : Ttdb1, 't1' : t1, 'Dctxi' : Dctxi}
     
     
     

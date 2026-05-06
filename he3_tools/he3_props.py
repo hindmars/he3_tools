@@ -911,7 +911,7 @@ def f_phase_norm(t, p, phase, squeeze_me=True, diagonal=False):
     if diagonal:
         f = -0.25* alpha_norm(t_a)**2 /( beta_phase_norm(t_a, p_a, phase, squeeze_me=False, diagonal=True))
     else:
-        f = -0.25* alpha_norm(t_a[:,None])**2 /( beta_phase_norm(t_a, p_a, phase, squeeze_me=False))
+        f = -0.25* alpha_norm(t_a)[:,None]**2 /( beta_phase_norm(t_a, p_a, phase, squeeze_me=False))
         
     f[f > 0] = 0.0
     
@@ -926,15 +926,21 @@ def delta_phase_norm(t, p, phase, squeeze_me=True, diagonal=False):
     t_a = np.atleast_1d(t)
     p_a = np.atleast_1d(p)
     
+    print(diagonal)
     if diagonal:
         d2 = - alpha_norm(t_a)/(2 * beta_phase_norm(t_a, p_a, phase, squeeze_me=False, diagonal=True))
     else:
-        d2 = - alpha_norm(t_a[:, None])/(2 * beta_phase_norm(t_a, p_a, phase, squeeze_me=False))
+        d2 = - alpha_norm(t_a)[:, None]/(2 * beta_phase_norm(t_a, p_a, phase, squeeze_me=False))
+        print('beta.shape',  beta_phase_norm(t_a, p_a, phase, squeeze_me=False).shape)
+        print('alpha.shape',alpha_norm(t_a[:, None]).shape)
+        print('d2.shape',d2.shape)
 
     d2[d2 < 0.0] = 0.0
     d = np.sqrt(d2)
+    print(d.shape)
     if squeeze_me:
         d = squeeze_float(d)
+    print(d.shape)
     return d
 
 def delta_wc(t):
