@@ -67,9 +67,9 @@ def delta_B_mag_norm_approx(t, p, H):
     In the B-phase, with the magnetic field along the z axis, these 
     are the diagonal elements of the order parameter matrix in a suitable basis.
     """
-    if isinstance(p, int):
+    if isinstance(p, (int, np.integer)):
         p = float(p)
-    if isinstance(t, int):
+    if isinstance(t, (int, np.integer)):
         t = float(t)
 
     al = h3p.alpha_norm(t)
@@ -209,7 +209,7 @@ def delta_A_mag_norm_approx(t, p, H):
     In the A-phase, with the magnetic field along the z axis, these 
     are the diagonal elements of the order parameter matrix in the standard basis.
     """
-    if isinstance(p, int):
+    if isinstance(p, (int, np.integer)):
         p = float(p)
     al = h3p.alpha_norm(t)
     bn = h3p.beta_norm_asarray(t, p)
