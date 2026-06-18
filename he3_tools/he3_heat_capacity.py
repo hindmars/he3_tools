@@ -135,6 +135,7 @@ def heat_capacity_high(V, T):
     #     raise ValueError("Temperature T must be positive.")
     # First sum over b_ij terms
     C_R = 0.0
+    print(type(T[0]))
     for i in range(4):          # i=0..3
         Ti = T ** (-i)
         Vpow = 1.0
@@ -185,7 +186,7 @@ def heat_capacity_Greywall(V, T):
     C_R[~low_T] = heat_capacity_high(V, T[~low_T])
     return C_R
 
-def heat_capacity_normal_liquid(T_K, p, units='default', T_K_lowest=0.007):
+def heat_capacity_normal_liquid(T_K, p, units='default', T_K_lowest=0.007, squeeze_me=True):
     r"""
     Heat caoacity from Greywall Phys Rev B27, 2747 (1983) & B29, 7520 (1986)
     For T < T_K_lowest selects C_V/RT from 1986 paper.
@@ -200,6 +201,8 @@ def heat_capacity_normal_liquid(T_K, p, units='default', T_K_lowest=0.007):
             SI: J / K m^3
             R: divided by gas constant R
             dimless: J/K in $k_B$, length unit $\xi_{GL}(0)$
+            dimlessB: same as dimless
+            dyGiLa: same as dimless
         T_K_lowest: (K) switch to theoretical below this temp
 
     Returns:
@@ -207,33 +210,41 @@ def heat_capacity_normal_liquid(T_K, p, units='default', T_K_lowest=0.007):
 
     """
     T = np.atleast_1d(T_K)
+    p_arr = np.atleast_1d(p)
     vlow_T = T < T_K_lowest
     low_T = (0.007 <= T) & (T <= 0.1)
     high_T = 0.1 < T
-    Cv = np.zeros_like(T)
-    V = h3p.molar_vol_cm3(p)
-    # print('p', p, 'V', V)
-    V_m3 = V * (1e-2)**3
-    if np.any(vlow_T):
-        # Cv[vlow_T] = C_V_normal(T[vlow_T]/h3p.Tc_K(p), p) * (h3c.N_A/h3p.npart(0))/h3c.R
-        Cv[vlow_T] = heat_capacity_vlow(V, T[vlow_T])                                        
-    if np.any(low_T):
-        Cv[low_T] = heat_capacity_low(V, T[low_T])  
-    if np.any(high_T):
-        Cv[high_T] = heat_capacity_high(V, T[high_T])
-        
-    if units == 'R':
-        factor = 1.0
-    elif units == 'SI':
-        factor = h3c.R / V_m3
-    elif units == 'dimless':
-        factor = (h3c.R/h3c.kB) / V_m3 * (h3p.xi(0, p)*1e-9)**3
-    elif units == 'eV_um3_mK':
-        factor =  (1e-6)**3 * (1e-3) * (h3c.R / V_m3) / h3c.cphy['electron volt'][0]
-    else: # he3_tools uses J / K / nm^3
-        factor = h3c.R / V_m3 * (1e-9)**3
+    Cv = np.zeros_like(np.outer(T,p_arr))
+    
+    for n, p_i in enumerate(p_arr):
+        V = h3p.molar_vol_cm3(p_i)
+        # print('p', p, 'V', V)
+        V_m3 = V * (1e-2)**3
+        if np.any(vlow_T):
+            # Cv[vlow_T] = C_V_normal(T[vlow_T]/h3p.Tc_K(p), p) * (h3c.N_A/h3p.npart(0))/h3c.R
+            Cv[vlow_T,n] = heat_capacity_vlow(V, T[vlow_T])                                        
+        if np.any(low_T):
+            Cv[low_T,n] = heat_capacity_low(V, T[low_T])  
+        if np.any(high_T):
+            Cv[high_T,n] = heat_capacity_high(V, T[high_T])
             
-    return h3p.squeeze_float(Cv*factor)
+        if units == 'R':
+            factor = 1.0
+        elif units == 'SI':
+            factor = h3c.R / V_m3
+        elif units == 'dimless' or units == 'dimlessB' or units == 'dyGiLa':
+            factor = (h3c.R/h3c.kB) / V_m3 * (h3p.xi(0, p_i)*1e-9)**3
+        elif units == 'eV_um3_mK':
+            factor =  (1e-6)**3 * (1e-3) * (h3c.R / V_m3) / h3c.cphy['electron volt'][0]
+        else: # he3_tools uses J / K / nm^3
+            factor = h3c.R / V_m3 * (1e-9)**3
+        
+        Cv[:,n] *= factor
+        
+    if squeeze_me:
+        Cv = h3p.squeeze_float(Cv)
+        
+    return Cv
 
 def C_V_normal(t, p, squeeze_me=True, diagonal=False):
     """
@@ -290,7 +301,7 @@ def C_V_normal(t, p, squeeze_me=True, diagonal=False):
 
 
 
-def delta_C_V_Tc(p, phase):
+def delta_C_V_Tc(p, phase, squeeze_me=False):
     """
     Jump in specific heat at superfluid phase transition in units J / K / nm$^3$, 
     with strong coupling corrections included.  Uses formula (3.78) from 
@@ -313,7 +324,11 @@ def delta_C_V_Tc(p, phase):
         Specific heat jump at pressure p.
 
     """
-    return  0.25 * h3p.f_scale(p) / (h3p.Tc_K(p) * h3p.beta_phase_norm(1, p, phase))
+    p = np.atleast_1d(p)
+    dcv = 0.25 * h3p.f_scale(p) / (h3p.Tc_K(p) * h3p.beta_phase_norm(1, p, phase))
+    if squeeze_me:
+        dcv = h3p.squeeze_float(dcv)
+    return  dcv
 
 def C_V(t, p, phase, squeeze_me=True, diagonal=False):
     """
@@ -346,11 +361,18 @@ def C_V(t, p, phase, squeeze_me=True, diagonal=False):
     t = np.atleast_1d(t)
     p = np.atleast_1d(p)
     
+    C_V_normal_model = C_V_normal
+    # def C_V_normal_model(t, p, units='default', squeeze_me=False): 
+    #     return heat_capacity_normal_liquid(t*h3p.Tc_K(p), p, units=units, squeeze_me=squeeze_me)
+    
     if diagonal:
-        c_v = t**3 * (C_V_normal(1,p) + delta_C_V_Tc(p, phase))
+        c_v = t**3 * (C_V_normal_model(1.0,p) + delta_C_V_Tc(p, phase))
+        c_v[t>1] = np.squeeze(C_V_normal_model(t[t>1], p, squeeze_me=False))
     else:
-        c_v = np.outer(t**3, C_V_normal(1,p) + delta_C_V_Tc(p, phase) )        
-        c_v[t>1,:] = C_V_normal(t[t>1], p, squeeze_me=False)
+        cv_dcv = np.atleast_1d(C_V_normal_model(1.0, p, squeeze_me=False) + delta_C_V_Tc(p, phase, squeeze_me=False))
+        c_v = np.outer(t**3, cv_dcv )        
+
+        c_v[t>1,:] = C_V_normal_model(t[t>1], p, squeeze_me=False)
 
     # c_v = np.squeeze(c_v)
     

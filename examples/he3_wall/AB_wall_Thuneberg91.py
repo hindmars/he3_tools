@@ -60,7 +60,7 @@ for p in p_array:
     
     beta_norm = pot.mat_pars.beta_arr/h.beta_const
     # sigma_AB = hw.surface_energy(A,pot,gr)*h.xi(0,p)/(abs(pot.mat_pars.f_B_norm())*h.xi(t,p))
-    print(f'{t:.3f}, {p:.1f}, {sigma_AB:.4f}, ' + ', '.join(f'{b:.3f}' for b in beta_norm ) )
+    print(f'{t:.3f}, {p:.1f}, {sigma_AB[0]:.4f}, ' + ', '.join([f'{b:.3f}' for b in beta_norm ]) )
     surface_energy_us.append(sigma_AB)
     # surface_energy_thune.append(hw.thuneberg_formula(t, p)) #/(-h.f_B_norm(t, p)*h.xi(t,p)))
 
@@ -72,8 +72,8 @@ surface_energy_thune = np.array(surface_energy_thune)
 
 plt.figure(figsize=(5,3))
 
-plt.plot(p_array_short, surface_energy_thune, label=r'Sauls-Serene $\beta_a$ (Thuneberg 1991)')
-plt.plot(p_array, surface_energy_us, label=r'RWS19 $\beta_a$')
+plt.plot(p_array_short, surface_energy_thune, marker='.', label=r'Sauls-Serene $\beta_a$ (Thuneberg 1991)')
+plt.plot(p_array, surface_energy_us,  marker='.', label=r'RWS19 $\beta_a$')
 plt.xlabel(r'$p$/bar')
 plt.ylabel(r'$\sigma_{AB}/|f_B|\xi_{GL}(T)$')
 plt.grid(True)

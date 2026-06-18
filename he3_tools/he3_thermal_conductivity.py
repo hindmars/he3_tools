@@ -186,6 +186,9 @@ def thermal_conductivity_normal_liquid(T_K, p, units='default', T_K_lowest= 0.00
         SI: J / s m K
         cgs: erg/sec cm K
         dimless: J / K in k_B, length unit xlGL(0), time unit xiGL(0)/vF
+        dimlessB: np.sqrt(5/3) of dimless (because of time unit used by dyGiLa)
+        dyGiLa: same as dimlessB
+        
     T_K_lowest: (K) switch to theoretical below this temp
 
     Returns:
@@ -212,6 +215,9 @@ def thermal_conductivity_normal_liquid(T_K, p, units='default', T_K_lowest= 0.00
         factor = 1.0
     elif units == 'dimless':
         factor = conv_erg_sec_cm_K_SI/h3c.kB * (h3p.xi(0,p)*1e-9)**2 / h3p.vf(p)
+    elif units == 'dimlessB' or units == 'dyGiLa':
+        factor = np.sqrt(5/3)*conv_erg_sec_cm_K_SI/h3c.kB * (h3p.xi(0,p)*1e-9)**2 / h3p.vf(p)
+        
     else:
         factor = conv_erg_sec_cm_K_SI * 1e-18
         
@@ -233,6 +239,9 @@ def kappa(t, p, units='default', T_K_lowest= 0.007):
         SI: J / s m K
         cgs: erg/sec cm K
         dimless: J / K in k_B, length unit xlGL(0), time unit xiGL(0)/vF
+        dimlessB: np.sqrt(5/3) of dimless (because of time unit used by dyGiLa)
+        dyGiLa: same as dimlessB
+
     T_K_lowest: (K) switch to theoretical below this temp, default 7 mK
 
     Returns

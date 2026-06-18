@@ -34,7 +34,8 @@ N, L_xi0 = (256, 32)
 #%% Get wall solution
 
 # Apg_kry, sigma_bw, sigma_tot = hw.get_wall(t, p, L_xi0 * h.xi(0,p), N=N, right_phase='B', f_tol=1e-6)
-Apg_kry, sigma_bw, sigma_tot = hw.get_wall(t, p, L_xi0 * h.xi(0,p), N=N, left_phase='Ay', right_phase='B', f_tol=1e-6)
+# Apg_kry, sigma_bw, sigma_tot = hw.get_wall(t, p, L_xi0 * h.xi(0,p), N=N, left_phase='Ay', right_phase='B1', f_tol=1e-3)
+Apg_kry, sigma_bw, sigma_tot = hw.get_wall(t, p, L_xi0 * h.xi(0,p), N=N, left_phase='Az', right_phase='B', f_tol=1e-3)
 
 # Apg_kry is a tuple
 # Apg_kry[0] is order parameter array, Apg_kry[0].shape = (N, 3, 3), complex

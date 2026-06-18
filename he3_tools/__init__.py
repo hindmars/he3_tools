@@ -22,7 +22,7 @@ from .he3_props import *
 from .he3_heat_capacity import *
 from .he3_thermal_conductivity import *
 
-for x in ["DEFAULT_SC_ADJUST", "DEFAULT_SC_CORRS", "DEFAULT_T_SCALE", "DEFAULT_ALPHA_TYPE", "DEFAULT_RWS19_PATCH"]:
+for x in ["DEFAULT_SC_ADJUST", "DEFAULT_SC_CORRS", "DEFAULT_T_SCALE", "DEFAULT_ALPHA_TYPE", "DEFAULT_RWS19_PATCH", "DEFAULT_SC_T_DEPEND"]:
     report_setting(x)
 
 

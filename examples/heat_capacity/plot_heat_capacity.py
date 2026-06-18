@@ -63,10 +63,10 @@ Tc_expt = he3.data_Gre86_expt_data_df['$T_c$ (mK)']
 
 for p, Cv_RT in zip(p_expt, Cv_RT_expt):
     T_arr = np.linspace(he3.Tc_mK(p), 5.5, 2)
-    # Cv_R = he3.heat_capacity_normal_liquid(T_arr*1e-3, p, 'R')
-    # Cv_RT = Cv_R/(T_arr*1e-3)
-    ax_lo.plot(T_arr, Cv_RT*np.ones_like(T_arr), ls='--', c='k')
-    ax_lo.text(T_arr[-1]+0.25, Cv_RT - 0.02, rf'{p:.2f}', fontsize='small')
+    Cv_R = he3.heat_capacity_normal_liquid(T_arr*1e-3, p, 'R')
+    Cv_RT = Cv_R/(T_arr*1e-3)
+    ax_lo.plot(T_arr, Cv_RT, ls='--', c='k')
+    ax_lo.text(T_arr[-1]+0.25, Cv_RT[0] - 0.02, rf'{p:.2f}', fontsize='small')
 
 ax_lo.plot(Tc_expt, Cv_RT_expt, ls='', c='k', marker='.', label='Table II')
 
@@ -88,3 +88,44 @@ ax_lo.grid(True)
 ax_lo.legend(ncols=2)
 
 ax_lo.set_title(r'$^3$He heat capacity, Greywall 1986 Fig. 15')
+
+#%% Superfluid phase heat capacity near Tc
+
+fig_sf, ax_sf = plt.subplots(3,3, figsize=(9,9))
+
+ax_sf = np.reshape(ax_sf, (9,))
+
+p_expt = he3.data_Gre86_expt_data_df['$P\ (\mathrm{bar})$']
+Cv_RT_expt = he3.data_Gre86_expt_data_df['$C_n / RT$ (K$^{-1}$)']
+Tc_expt = he3.data_Gre86_expt_data_df['$T_c$ (mK)']
+
+T_arr = np.linspace(0.5,5.0,50)
+
+for n, (p, Cv_RT) in enumerate(zip(p_expt[3:], Cv_RT_expt[3:])):
+    Cv_R = he3.heat_capacity_normal_liquid(T_arr*1e-3, p, 'R')
+    # Cv_RT = Cv_R/(T_arr*1e-3)
+    # ax_sf[n].plot(T_arr, he3.C_V(T_arr/he3.Tc_mK(p), p, 'A') * (1000), c='k')
+    ax_sf[n].plot(T_arr, he3.C_V(T_arr/he3.Tc_mK(p), p, 'A') * (1000)/he3.kB/he3.R, c='k')
+    ax_sf[n].plot(T_arr, Cv_R * 1000, ls='--', c='k')
+    ax_sf[n].text(4.0, 10.0, rf'{p:.2f}', fontsize='small')
+
+# ax_sf.plot(Tc_expt, Cv_RT_expt, ls='', c='k', marker='.', label='Table II')
+
+
+# p_arr = np.linspace(p_expt.iloc[0], p_expt.iloc[-1], 20)
+# Tc_arr = he3.Tc_mK(p_arr)
+# # Cv_Tc = he3.heat_capacity_normal_liquid(he3.Tc_mK(p_arr)*1e-3, p_arr,'R')
+# ax_sf.plot(Tc_arr, he3.C_RT_poly_Greywall(p_arr), ls='--', c='k', label='Eqs 5, 17')
+
+# ax_sf.set_xlim(0, 7)
+# ax_sf.set_ylim(2.6, 4.8)
+
+
+# ax_sf.set_xlabel(r'$T/$mK')
+# ax_sf.set_ylabel(r'$C_V/RT$ [K$^{-1}$]')
+# _ = ax_sf.set_yticks(np.arange(2.6, 4.801, 0.2))
+
+# ax_sf.grid(True)
+# ax_sf.legend(ncols=2)
+
+ax_lo.set_title(r'$^3$He heat capacity, Greywall 1986 Fig. 4')

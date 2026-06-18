@@ -21,14 +21,17 @@ SET_T_SCALE= {"Greywall", "PLTS"}
 DEFAULT_T_SCALE="Greywall" 
 # DEFAULT_T_SCALE="PLTS" 
 
-sc_corrs_interp = {"RWS19", "RWS19-interp", "Wiman-thesis", "Choi-interp", "SS81-interp"}
+sc_corrs_interp = {"none", "BCS", "RWS19", "RWS19-interp", "Wiman-thesis", "Choi-interp", "SS81-interp"}
 sc_corrs_poly = {"RWS19-poly", "Choi-poly", "WS15", "WS15-poly"}
 # SET_SC_CORRS= {"RWS19", "Wiman-thesis", "Choi-interp", "WS15", "Choi-poly"}
-SET_SC_CORRS= sc_corrs_interp.union(sc_corrs_poly)
+SET_SC_CORRS = sc_corrs_interp.union(sc_corrs_poly)
 
 DEFAULT_SC_CORRS="RWS19"
 # DEFAULT_SC_CORRS="Wiman-thesis"
 # DEFAULT_SC_CORRS="Choi"
+
+SET_SC_T_DEPEND = {'WS15', 'Hei+24', 'none'}
+DEFAULT_SC_T_DEPEND = 'WS15'
 
 # Do we want to adjust the SC corrections to get TAB right?
 SET_SC_ADJUST = {True, False}
@@ -69,6 +72,8 @@ def report_setting(name):
 def set_default(name, xval):
     """Sets value of a globally defined variable.
     """
+    if 'DEFAULT_' not in name:
+        name = 'DEFAULT_' + name
     set_name = name.replace("DEFAULT_", "SET_")
     if xval in globals()[set_name]:
         globals()[name] = xval
@@ -776,10 +781,23 @@ def delta_b(p, n):
     'Wiman-thesis': From beta curves in Figure 8, grabbed using WPD, interpolated.
     """
 
-    if DEFAULT_SC_CORRS in sc_corrs_poly:
-        db = h3d.dbeta_data_dict[DEFAULT_SC_CORRS][n-1](p)
+    
+    if DEFAULT_SC_CORRS == 'none':
+        if isinstance(p, np.ndarray):
+            db = np.zeros_like(p)
+        else:
+            db = 0.0
+    elif DEFAULT_SC_CORRS == 'BCS':
+        db_const = h3c.a0/h3c.a_bcs - 1
+        if isinstance(p, np.ndarray):
+            db = np.ones_like(p)*db_const
+        else:
+            db = db_const
     else:
-        db = delta_b_interp(p, n)
+        if DEFAULT_SC_CORRS in sc_corrs_poly:
+            db = h3d.dbeta_data_dict[DEFAULT_SC_CORRS][n-1](p)
+        else:
+            db = delta_b_interp(p, n)
     
     # if DEFAULT_SC_ADJUST:
     #         db *= np.exp(-sc_adjust_fun(p))
@@ -820,10 +838,10 @@ def alpha_bcs(t):
     """
     return (t**h3c.a_bcs - 1 )/h3c.a_bcs
 
-def alpha_norm(t, squeeze_me=True):
+def alpha_norm(t, squeeze_me=False):
     """Quadratic material parameter
     """
-    t_a = np.float64(np.atleast_1d(t))
+    t_a = np.atleast_1d(t)
     if DEFAULT_ALPHA_TYPE == "GL":
         a = t_a - np.float64(1.0)
     elif DEFAULT_ALPHA_TYPE == "BCS":
@@ -849,11 +867,39 @@ def beta_wc_norm_asarray():
     beta_wc_norm_list = [ beta_wc_norm(n) for n in range(1,6)]
     return np.array(beta_wc_norm_list)
 
+def beta_phase_wc_norm(phase):
+    """Weak coupling material parameters for phase, 
+    with units of f_scale/(2 * np.pi * kB * Tc)**2
+    """ 
+    return np.sum( (beta_wc_norm_asarray().T * h3b.R_dict[phase]).T, axis=0)
+
+def beta_A_wc_norm():
+    """Weak coupling material parameters for A phase, 
+    with units of f_scale/(2 * np.pi * kB * Tc)**2
+    """ 
+    return np.sum( (beta_wc_norm_asarray().T * h3b.R_dict['A']).T, axis=0)
+
+def beta_B_wc_norm():
+    """Weak coupling material parameters for B phase, 
+    with units of f_scale/(2 * np.pi * kB * Tc)**2
+    """ 
+    return np.sum( (beta_wc_norm_asarray().T * h3b.R_dict['B']).T, axis=0)
+
 def delta_beta_norm(t, p, n):
     """Strong coupling correction to material parameter beta(n), 
     with units of f_scale/(2 * np.pi * kB * Tc)**2
     """ 
-    t_a = np.atleast_1d(t)
+    if DEFAULT_SC_T_DEPEND == 'WS15':
+        t_a = np.atleast_1d(t)
+    elif DEFAULT_SC_T_DEPEND == 'Hei+24':
+        beta_wc_norm_asarray()
+        beta_A_wc_norm = np.sum( (beta_wc_norm_asarray().T * h3b.R_dict['A']).T, axis=0) 
+        t_a = 1 + 0.09 * alpha_bcs(np.atleast_1d(t))/(2*beta_A_wc_norm)
+    elif DEFAULT_SC_T_DEPEND == 'none':
+        t_a = np.ones_like(np.atleast_1d(t))
+    else:
+        raise ValueError('beta_norm: DEFAULT_SC_T_DEPEND not recognised')
+
     p_a = np.atleast_1d(p)
     t_db = np.outer(t_a, delta_b(p_a, n))
 
@@ -869,7 +915,17 @@ def beta_norm(t, p, n, squeeze_me=True, diagonal=False):
     """ 
     b = b_wc(n)
     
-    t_a = np.atleast_1d(t)
+    if DEFAULT_SC_T_DEPEND == 'WS15':
+        t_a = np.atleast_1d(t)
+    elif DEFAULT_SC_T_DEPEND == 'Hei+24':
+        beta_wc_norm_asarray()
+        beta_A_wc_norm = np.sum( (beta_wc_norm_asarray().T * h3b.R_dict['A']).T, axis=0) 
+        t_a = 1 + (0.09/np.sqrt(3)) * alpha_bcs(np.atleast_1d(t))/(2*beta_A_wc_norm)
+    elif DEFAULT_SC_T_DEPEND == 'none':
+        t_a = np.ones_like(np.atleast_1d(t))
+    else:
+        raise ValueError('beta_norm: DEFAULT_SC_T_DEPEND not recognised')
+        
     p_a = np.atleast_1d(p)
     
     if diagonal:
@@ -926,21 +982,21 @@ def delta_phase_norm(t, p, phase, squeeze_me=True, diagonal=False):
     t_a = np.atleast_1d(t)
     p_a = np.atleast_1d(p)
     
-    print(diagonal)
+    # print(diagonal)
     if diagonal:
         d2 = - alpha_norm(t_a)/(2 * beta_phase_norm(t_a, p_a, phase, squeeze_me=False, diagonal=True))
     else:
         d2 = - alpha_norm(t_a)[:, None]/(2 * beta_phase_norm(t_a, p_a, phase, squeeze_me=False))
-        print('beta.shape',  beta_phase_norm(t_a, p_a, phase, squeeze_me=False).shape)
-        print('alpha.shape',alpha_norm(t_a[:, None]).shape)
-        print('d2.shape',d2.shape)
+        # print('beta.shape',  beta_phase_norm(t_a, p_a, phase, squeeze_me=False).shape)
+        # print('alpha.shape',alpha_norm(t_a[:, None]).shape)
+        # print('d2.shape',d2.shape)
 
     d2[d2 < 0.0] = 0.0
     d = np.sqrt(d2)
-    print(d.shape)
+    # print(d.shape)
     if squeeze_me:
         d = squeeze_float(d)
-    print(d.shape)
+    # print(d.shape)
     return d
 
 def delta_wc(t):

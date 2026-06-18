@@ -44,5 +44,5 @@ lambda_A1 = 60.1e-3 # mK/T
 # BCS constants
 a_bcs = 3.235 # Exponent for fit to BCS gap
 delta_bcs0 = np.pi * np.exp(-np.euler_gamma)
-
+a0 = 1/(10*beta_const*delta_bcs0**2)
 

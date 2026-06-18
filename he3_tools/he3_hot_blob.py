@@ -31,8 +31,8 @@ rhul_lake_vol_mm3[5] = 0.120
 rhul_lake_vol_mm3[0] = np.sum(rhul_lake_vol_mm3[1:])
 
 schiffer_tube_vol_mm3 = np.zeros((3,))
-schiffer_tube_vol_mm3[1] = 10.0 * (5.708 + 4.656) * 1.0
-schiffer_tube_vol_mm3[2] = 10.0 * (5.685 + 12.541) * 1.0
+schiffer_tube_vol_mm3[1] = 10.0 * (5.708 + 4.656) * np.pi * 0.5**2
+schiffer_tube_vol_mm3[2] = 10.0 * (5.685 + 12.541) * np.pi * 0.5**2
 
 schiffer_tube_vol_mm3[0] = np.sum(schiffer_tube_vol_mm3[1:])
 
@@ -460,7 +460,7 @@ def rhul_lifetime_to_eV(life, efficiency=1.0, vol=rhul_lake_vol_mm3[1]):
     
     return Qi_eV
     
-def tmax_from_hot_blob_radius(p, Rmax_nm, units='dimless'):
+def tmax_from_hot_blob_radius(p, Rmax_nm, units='dimless', thermal_diffusivity=None):
     """
     Get the time at which the hot blob reaches maximum radius Rmax_nm, given in 
     nm.  The units can be chosen to be:
@@ -483,7 +483,12 @@ def tmax_from_hot_blob_radius(p, Rmax_nm, units='dimless'):
         Time at which the hot blob reaches maximum radius.
 
     """
-    tmax = (Rmax_nm/h3p.xi(0,p))**2/(6 * h3p.thermal_diffusivity_norm(1, p, units))
+    if thermal_diffusivity is None:
+       Dtcxi = h3p.thermal_diffusivity_norm(1, p, units)
+    else:
+       Dtcxi = thermal_diffusivity
+        
+    tmax = (Rmax_nm/h3p.xi(0,p))**2/(6 * Dtcxi )
     return tmax
     
 # def hot_blob_radius_at_tmax(p, tmax, units='default'):
@@ -518,7 +523,7 @@ def central_tred_at_tmax(t):
     
     return np.exp(1.5) * (1 -t) + t
     
-def dyGiLa_params_hot_blob(t, p, Rmax_nm):
+def dyGiLa_params_hot_blob(t, p, Rmax_nm, thermal_diffusivity=None):
     """
     
 
@@ -540,8 +545,11 @@ def dyGiLa_params_hot_blob(t, p, Rmax_nm):
     
     Ttdb0 = t
     Ttdb1 = central_tred_at_tmax(t)
-    t1 = tmax_from_hot_blob_radius(p, Rmax_nm, units='dyGiLa')
-    Dctxi = h3p.thermal_diffusivity_norm(1, p, units='dyGiLa')
+    if thermal_diffusivity is None:
+        Dctxi = h3p.thermal_diffusivity_norm(1, p, units='dyGiLa')
+    else:
+        Dctxi = thermal_diffusivity
+    t1 = tmax_from_hot_blob_radius(p, Rmax_nm, units='dyGiLa', thermal_diffusivity=Dctxi)
     
     return {'Ttdb0'  : Ttdb0, 'Ttdb1'  : Ttdb1, 't1' : t1, 'Dctxi' : Dctxi}
     

@@ -21,6 +21,8 @@ from scipy.optimize import bisect
 from scipy.optimize import NoConvergence
 
 DEFAULT_NK_x_rtol = 1e-5
+# DEFAULT_SIGMA = 0.895 # From he3_tools.he3_wall, example
+DEFAULT_SIGMA = 0.95 # Original he3_tools, with bug in he3_wall
 
 def uB_mag_norm(delta_ss, t, p, H):
     if isinstance(p, int):
@@ -211,7 +213,7 @@ def delta_A_mag_norm_approx(t, p, H):
     """
     if isinstance(p, (int, np.integer)):
         p = float(p)
-    al = h3p.alpha_norm(t)
+    al = h3p.alpha_norm(t, squeeze_me=True)
     bn = h3p.beta_norm_asarray(t, p)
     eta = h3p.gz(p)
     
@@ -243,7 +245,8 @@ def delta_A_mag_norm_approx(t, p, H):
     else:
         raise ValueError('delta_A1A2_norm_approx: p must be float or ndarray.\n' + 
                          'Was {}.'.format(type(p)))
-        
+    
+    # print(x, y, z)
     return np.array([x, y, z])
     
 def f_A_mag_norm_approx(t, p, H):
@@ -281,7 +284,7 @@ def tcA2(p, H):
 #   zero PHA approximation
 #
 
-def HAB_T(t, p):
+def HAB_T(t, p, low_pressure_nan=True):
     """Magnetic field in tesla at which free energies of A and B phases are equal.
     
     t : float
@@ -299,10 +302,10 @@ def HAB_T(t, p):
     
     if isinstance(p, int):
         p = float(p)
-        if t > 1:
+        if t > 1 and low_pressure_nan:
             return np.nan
 
-    if t > 1:
+    if t > 1 and low_pressure_nan:
         return np.nan*np.ones_like(p)
     
     bn = h3p.beta_norm_asarray(t, p)
@@ -360,7 +363,7 @@ def tAB_mag(p, H, t_init=None):
     # if t_init is None:
     t_init = h3p.tAB(p, low_pressure_nan=False)
 
-    print('tAB initial guess', t_init)
+    print('p', p, 'H', H, 'tAB initial guess', t_init)
 
     try:
         # tAB = newton_krylov(F, t_init)
@@ -504,12 +507,12 @@ def line_section(X, D, t, p, H, path='linear', scale=None, norm_preserve=False, 
     
     return v, A_XD, U_XD
 
-def surface_energy_AB_approx(t, p, H=0, sigma=0.95):
+def surface_energy_AB_approx(t, p, H=0, sigma=DEFAULT_SIGMA):
     """Surface energy of AB interface, uses sigma_AB = sigma * f_B * xi_GL
     """
     return sigma*np.abs(f_phase_mag_norm('B', t, p, H))*h3p.xi(t,p)
 
-def critical_radius(t_in, p_in, H=0, sigma=0.95, dim=3):
+def critical_radius(t_in, p_in, H=0, sigma=DEFAULT_SIGMA, dim=3):
     """Radius of thin-wall critical bubble, in nm, with magnetic field. 
     Units: nm
 
@@ -554,7 +557,7 @@ def critical_radius(t_in, p_in, H=0, sigma=0.95, dim=3):
     
     return h3p.squeeze_float((dim-1)*sigma_AB/(f_A_mag_norm - f_B_mag_norm))
 
-def critical_energy(t_in, p_in, H=0, cell_height=np.inf, sigma=0.95):
+def critical_energy(t_in, p_in, H=0, cell_height=np.inf, sigma=DEFAULT_SIGMA):
     """Energy of thin-wall critical bubble, with magnetic field.  
     If cell_height_nm is not np.inf, returns the energy of critical "cylinder" 
     in confined geometry.

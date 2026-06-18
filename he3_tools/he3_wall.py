@@ -945,9 +945,11 @@ def plot_wall(A, pot, gr,
     r_terms =  h.R_terms(A)
 
     # f_B_mag_norm = h3b.f_B_mag_norm_approx(t, p, H)
-    f_B_mag_norm = h3b.f_phase_mag_norm('B', t, p, H)
-    f_A_mag_norm = h3b.f_phase_mag_norm('A', t, p, H)
+    f_B_mag_norm = h3b.f_phase_mag_norm('B', t, p, H)[0]
+    f_A_mag_norm = h3b.f_phase_mag_norm('A', t, p, H)[0]
 
+    print('f_B_mag_norm',f_B_mag_norm)
+    print('surface_energy(A, pot, gr)',surface_energy(A, pot, gr))
     sigma = surface_energy(A, pot, gr)*h.xi(0,p)/(abs(f_B_mag_norm)*h.xi(t,p))
 
     try: 
@@ -1054,6 +1056,7 @@ def plot_wall(A, pot, gr,
         
     ax[2].set_ylim(0,1.1)
     
+    print(t, t*h.Tc_mK(p), p, H, xiGL, sigma)
     title_str = title_string.format(t, t*h.Tc_mK(p), p, H, xiGL, sigma) 
     
     if phase_marker:
