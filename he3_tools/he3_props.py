@@ -1103,14 +1103,24 @@ def TAB_mK(p):
     return tAB(p) * Tc_mK_expt(p)
 
 
-def gamma_c(p):
-    """
-    Order parameter damping rate at $T_c$. Units are ns$^{-1}$
+def gamma_c(p, units='/ns'):
+    r"""
+    Order parameter damping rate at $T_c$. Default units are ns$^{-1}$
+
+    Other units
+        "dimless" : multiply by $t_{\rm GL} = \xi_{\rm GL}/v_f$ 
+        "dimlessB" or "dyGiLa" : $t_{\rm GL}^B = \sqrt{5/3} \xi_{\rm GL}/v_f$ 
+        "/ns" : default
+        "SI" : 
+
 
     Parameters
     ----------
     p : float, int, numpy.ndarray
         Pressure in bar.
+
+    units : str
+        see above
 
     Returns
     -------
@@ -1118,7 +1128,25 @@ def gamma_c(p):
         Order parameter damping rate at $T_c$
 
     """
-    return (16 * h3c.kB * Tc_mK(p)*1e-3) / (np.pi * h3c.hbar) * 1e-9
+    
+    ga_c = (16 * h3c.kB * Tc_K(p)) / (np.pi * h3c.hbar) * 1e-9
+    
+    if units == 'dimless':
+        factor = tGL(p)
+    elif units == 'dimlessB' or units == 'dyGiLa':
+        factor = np.sqrt(5/3) * tGL(p)
+    elif units == '/ns':
+        factor = 1.0
+    elif units == 'SI':
+        factor = 1e9
+    else:
+        print('gamma_c: No units specified, factor = 1.0')
+        factor = 1.0
+        
+    return factor * ga_c
+
+    
+    return 
 
 def thermal_diffusivity(t, p):
     r"""
