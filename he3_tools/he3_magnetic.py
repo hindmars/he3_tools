@@ -523,6 +523,9 @@ def critical_radius(t_in, p_in, H=0, sigma=DEFAULT_SIGMA, dim=3):
     # if isinstance(sigma_fun, float):
     # sigma_AB = sigma*np.abs(f_B_mag_norm_approx(t,p,H))*h3p.xi(t,p)
     
+    if not np.isscalar(H):
+        raise ValueError('critical_radius: H must be a scalar')
+    
     t_in = np.atleast_1d(t_in)
     p_in = np.atleast_1d(p_in)
     # f_B_mag_norm = np.zeros_like(t_in)

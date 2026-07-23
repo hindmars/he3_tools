@@ -74,7 +74,8 @@ def Uargs_parse(*args):
         Reduced temperature, $t = T/T_c(p)$.
     p : float
         Pressure [bar].
-
+    H : ndarray shape (3,)
+        Magnetic field  (tesla)
     """
     n_el = len(args)
     gH = 0.
