@@ -260,6 +260,22 @@ def npart(p):
         
     return np.interp(p, h3d.p_nodes, n_part, left=0.5*n_part[0], right=2.0*n_part[-1])
 
+def density(p, units='cgs'):
+    """
+    Mass density at pressure p (bar).  Units can be cgs (default) or SI.
+    """
+    
+    rho_kg_nm3 = npart(p) * h3c.mhe3_kg 
+
+    if units == 'SI':
+        factor = 1e9**3
+    elif units == 'cgs':
+        factor = 1e7**3 * 1000
+    else:
+        raise ValueError('density: units not recognised')
+        
+    return factor*rho_kg_nm3
+
 def molar_vol_cm3(p):
     """Molar volume at pressure p bar ($cm^{3}$).
     """
@@ -838,7 +854,7 @@ def alpha_bcs(t):
     """
     return (t**h3c.a_bcs - 1 )/h3c.a_bcs
 
-def alpha_norm(t, squeeze_me=False):
+def alpha_norm(t, squeeze_me=True):
     """Quadratic material parameter
     """
     t_a = np.atleast_1d(t)

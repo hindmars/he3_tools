@@ -376,3 +376,26 @@ data_Tan91_mag_supp_B_df = pd.read_csv(os.path.join(data_sources_dir, 'Tang_et_a
 data_RWS19_mat_pars = np.loadtxt(os.path.join(data_sources_dir, 'Regan_Wiman_Sauls_2019_Table1.csv'), delimiter=',', skiprows=2)
 data_RWS19_mat_pars_df = pd.read_csv(os.path.join(data_sources_dir, 'Regan_Wiman_Sauls_2019_Table1.csv'), header=0, skiprows=[1])
 
+###############################################################################################################
+##########           RHUL cell data
+###############################################################################################################
+
+rhul_lake_vol_mm3 = np.zeros((6,))
+
+rhul_lake_vol_mm3[1] = 0.024
+rhul_lake_vol_mm3[2] = 0.072
+rhul_lake_vol_mm3[3] = 0.056
+rhul_lake_vol_mm3[4] = 0.075
+rhul_lake_vol_mm3[5] = 0.120
+
+rhul_lake_vol_mm3[0] = np.sum(rhul_lake_vol_mm3[1:])
+
+###############################################################################################################
+##########           Schiffer et al 1992 cell data
+###############################################################################################################
+
+schiffer_tube_vol_mm3 = np.zeros((3,))
+schiffer_tube_vol_mm3[1] = 10.0 * (5.708 + 4.656) * np.pi * 0.5**2
+schiffer_tube_vol_mm3[2] = 10.0 * (5.685 + 12.541) * np.pi * 0.5**2
+
+schiffer_tube_vol_mm3[0] = np.sum(schiffer_tube_vol_mm3[1:])

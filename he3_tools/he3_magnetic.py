@@ -406,7 +406,7 @@ def find_mag_phase(phase, *args):
     except NoConvergence as e:
         A = e.args[0]
         print('find_mag_phase: no Convergence')
-        
+    
     return A
 
 def f_phase_mag_norm(phase, *args):
@@ -417,8 +417,10 @@ def f_phase_mag_norm(phase, *args):
     al, bn, gH, gz, t, p, H = h3fe.Uargs_parse(*args)
     
     A_ext = find_mag_phase(phase, *args)
-        
-    return h3fe.U(A_ext, *args)
+    
+    fe = h3fe.U(A_ext, *args)
+
+    return fe
 
 def line_section(X, D, t, p, H, path='linear', scale=None, norm_preserve=False, n=500):
     """

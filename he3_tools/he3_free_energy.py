@@ -174,7 +174,19 @@ def U(A, *args):
     fHn2 = gH * np.dot(np.matmul(AA_H, H), H)
     fHn1 = -1j * gz * np.dot(h3m.levi_civita3_matrix2vector(AA_H), H)
     # print((Un0 + Un1 + Un2 + Un3 + Un4 + Un5 + fHn2 + fHn1).imag)
-    return (Un0 + Un1 + Un2 + Un3 + Un4 + Un5 + fHn2 + fHn1).real
+    
+    # print('alpha', al.shape) 
+    # print('Un0', Un0.shape) 
+    # print('Un1', Un1.shape) 
+    # print('Un2', Un2.shape) 
+    # print('Un3', Un3.shape) 
+    # print('Un4', Un4.shape) 
+    # print('Un5', Un5.shape) 
+    # print('fHn1', fHn1.shape)
+    # print('fHn2', fHn2.shape)
+    Utotal = Un0 + Un1 + Un2 + Un3 + Un4 + Un5 + fHn2 + fHn1
+    # print('Utotal', Utotal.shape) 
+    return Utotal.real
     # return (Un0 + Un1 + Un2 + Un3 + Un4 + Un5).real
 
 

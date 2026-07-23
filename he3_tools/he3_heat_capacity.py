@@ -272,7 +272,7 @@ def C_V_normal(t, p, squeeze_me=True, diagonal=False):
     float or numpy.ndarray
         Normal phase specific heat at temperature $t$ and pressure $p$. 
         If both t and p are 1D arrays of length greater than 1, the return 
-        value has shape (len(t), len(p))
+        value has shape (len(t), len(p)), unless diagonal is True.
 
     """
     
@@ -298,8 +298,6 @@ def C_V_normal(t, p, squeeze_me=True, diagonal=False):
     if squeeze_me:
         c_v = h3p.squeeze_float(c_v)
     return c_v
-
-
 
 def delta_C_V_Tc(p, phase, squeeze_me=False):
     """
