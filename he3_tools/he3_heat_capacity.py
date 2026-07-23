@@ -299,7 +299,7 @@ def C_V_normal(t, p, squeeze_me=True, diagonal=False):
         c_v = h3p.squeeze_float(c_v)
     return c_v
 
-def delta_C_V_Tc(p, phase, squeeze_me=False):
+def delta_C_V_Tc(p, phase, squeeze_me=True):
     """
     Jump in specific heat at superfluid phase transition in units J / K / nm$^3$, 
     with strong coupling corrections included.  Uses formula (3.78) from 
